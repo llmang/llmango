@@ -19,5 +19,4 @@ Organizes LLM queries into Goals, Solutions, and Prompts. Focus on outcomes, not
 
 ## Install
 
-```bash
 ~~go get github.com/llmang/llmango
