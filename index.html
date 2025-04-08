@@ -1,0 +1,357 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LLMang - Goal-Driven LLM Framework for Go</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism.min.css" rel="stylesheet" />
+    <style>
+        * {
+            --primary:#0067d4;
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            scroll-behavior: smooth;
+        }
+        .logo{
+            font-weight: 700;
+            letter-spacing: -.06em;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            background-color: #f9f9f9;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        section, section.container {
+            padding: 4rem 1rem;
+        }
+        header {
+            padding:0 1rem;
+            background-color: var(--primary);
+            color: white;
+            border-bottom: 1px solid rgba(128, 128, 128, 0.5);
+        }
+        .header-container {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        header h1 {
+            font-size: 2.5rem;
+        }
+        nav {
+            display: flex;
+            flex-wrap: wrap;
+            width: fit-content;
+        }
+        nav ul {
+            display: flex;
+            list-style: none;
+        }
+        nav ul li {
+            margin: 0 1.5rem;
+        }
+        nav ul li a {
+            text-decoration: none;
+            color: white;
+            font-weight: 600;
+            transition: color 0.3s;
+        }
+        nav ul li a:hover {
+            color: #0056b3;
+        }
+  
+        h2 {
+            font-size: 2rem;
+            color: var(--primary);
+            margin-bottom: 1.5rem;
+            text-align: center;
+        }
+        p {
+            font-size: 1.1rem;
+            margin-bottom: 1rem;
+        }
+        .hero-wrapper {
+            color: white;
+            width: 100%;
+            background-color: var(--primary);
+        }
+        .hero {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            flex-wrap: wrap;
+            background-color: transparent;
+            gap:3rem;
+        }
+        .hero-text {
+            flex: 2;
+            min-width: 300px;
+            display: flex;
+            flex-direction: column;
+        }
+        .hero-text h2, .hero-text p {
+            color: white;
+            text-align: left;
+        }
+        .hero-grab {
+            font-size: 2.4rem;
+            font-weight: 500;
+            margin-bottom: 0.8rem;
+        }
+        .hero-image {
+            flex: 1;
+            text-align: center;
+            min-width: 300px;
+        }
+        .icon-placeholder {
+            width: 200px;
+            height: 200px;
+            background-color: #e0e0e0;
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto;
+            font-size: 1rem;
+            color: #666;
+        }
+        .features {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 2rem;
+            margin-top: 2rem;
+        }
+        .feature-card {
+            background-color: #fff;
+            padding: 1.5rem;
+            border-radius: 10px;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.05);
+            text-align: center;
+        }
+        .feature-card h3 {
+            color: var(--primary);
+            margin-bottom: 1rem;
+        }
+        pre {
+            background-color: #f4f4f4;
+            padding: 1rem;
+            border-radius: 5px;
+            overflow-x: auto;
+        }
+        .screenshot {
+            max-width: 100%;
+            height: auto;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            margin: 1rem 0;
+        }
+        footer {
+            background-color: var(--primary);
+            color: white;
+            text-align: center;
+            padding: 1.5rem 0;
+        }
+        .btn {
+            display: inline-block;
+            padding: 0.8rem 2rem;
+            background-color: var(--primary);
+            color: white;
+            text-decoration: none;
+            border-radius: 3px;
+            transition: background-color 0.3s;
+        }
+        .btn:hover {
+            background-color: #0056b3;
+        }
+        .start-button {
+            align-self: flex-start;
+            margin: 2rem 0 0 0;
+            border: none;
+            font-size: 1.5rem;
+            padding: 1.2rem 3.5rem;
+            min-width: 250px;
+            text-align: center;
+            background-color: rgb(255, 177, 32);
+            color: black;
+        }
+        .start-button:hover {
+            background-color: rgb(245, 167, 22);
+            transform: translateY(-2px);
+            transition: all 0.3s;
+        }
+
+        .carsho-link {
+            color: #fff;
+            text-decoration: underline;
+            transition: opacity 0.3s;
+        }
+        .carsho-link:hover {
+            opacity: 0.8;
+        }
+        ul {
+          list-style-type: '✔ ';
+          list-style-position: inside;
+          padding-left: 0;
+        }
+        li{
+            margin-bottom:.4rem
+        }
+
+        .screenshot-container {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 1rem;
+            justify-content: center;
+        }
+
+        .hero-image{max-width: 300px;}
+        .image-wrapper{
+            padding:1rem 0;
+            width: 100%;
+            flex:1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .truck-image{
+            width:400px;
+            max-width: 100%;
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <div class="container header-container">
+            <h1 class="logo">LLMang</h1>
+            <nav>
+                <ul>
+                    <li><a href="#home">Home</a></li>
+                    <li><a href="#features">Features</a></li>
+                    <li><a href="#usage">Usage</a></li>
+                    <li><a href="#get-started">Get Started</a></li>
+                </ul>
+            </nav>
+        </div>
+    </header>
+
+    <div class="hero-wrapper">
+        <section id="home" class="container hero">
+            <div class="hero-text">
+                <h2 class="hero-grab">Hardcode Goals, Not Prompts</h2>
+                <ul>
+                    <li>Structure LLM interactions around Goals, not specific prompts</li>
+                    <li>Focus on what you want to achieve, not how to ask for it</li>
+                    <li>Consistent outcomes with type-safe inputs and outputs</li>
+                    <li>Built-in management for rate limits, retries, and fallbacks</li>
+                    <li>Test multiple prompts at the same time</li>
+                </ul>
+                <a href="#get-started" class="btn start-button">Get Started</a>
+            </div>
+            <div class="image-wrapper">
+                <img class="hero-image" src="https://public.llmang.com/logos/mang-tractor.png"/>
+            </div>
+        </section>
+    </div>
+
+    <section id="features" class="container">
+        <h2>Why LLMang?</h2>
+        <div class="features">
+            <div class="feature-card">
+                <h3>Goal-Driven</h3>
+                <p>Structure your LLM usage around goals with type-safe inputs and outputs.</p>
+            </div>
+            <div class="feature-card">
+                <h3>Simplified Management</h3>
+                <p>Handle rate limits, logging, and retries without cluttering your code.</p>
+            </div>
+            <div class="feature-card">
+                <h3>Canary Testing</h3>
+                <p>Test multiple solutions in production with real user data.</p>
+            </div>
+            <div class="feature-card">
+                <h3>Frontend Included</h3>
+                <p>Optional UI for managing prompts, logs, and tests.</p>
+            </div>
+        </div>
+    </section>
+
+    <hr style="margin: 2rem 0; border: 0; height: 1px; background-image: linear-gradient(to right, rgba(0, 0, 0, 0), rgba(0, 0, 0, 0.75), rgba(0, 0, 0, 0));">
+    <p style="text-align: center; font-weight: bold; color: var(--primary);">llmango: Go-specific package implementation</p>
+
+    <section id="usage" class="container">
+        <h2>How It Works</h2>
+        <p>Define a goal in your <code>mango</code> internal package:</p>
+        <pre><code class="language-go">package mango
+
+import "github.com/llmang/llmango"
+
+type TesterInput struct {
+    FirstString  string `json:"firstString"`
+    SecondString string `json:"secondString"`
+}
+
+type TesterOutput struct {
+    FirstSentence  string `json:"firstSentence"`
+    SecondSentence string `json:"secondSentence"`
+}
+
+var testerGoal = llmango.Goal[TesterInput, TesterOutput]{
+    GoalInfo: llmango.GoalInfo{
+        UID:         "tester-two-sentences-two-strings",
+        Title:       "Create Two Sentences From Two Strings",
+        Description: "Create sentences using two strings in different orders.",
+    },
+    Validator: nil,
+}
+</code></pre>
+        <p>Run <code>llmango create</code> to generate type-safe functions, then use it in your code:</p>
+        <pre><code class="language-go">output, err := mango.DoGoal1(input)
+</code></pre>
+
+        <hr style="margin: 2rem 0; border: 0; height: 1px; background-image: linear-gradient(to right, rgba(0, 0, 0, 0), rgba(0, 0, 0, 0.75), rgba(0, 0, 0, 0));">
+        <p style="text-align: center; font-weight: bold; color: var(--primary);">llmang: General framework with UI</p>
+
+        <p>Add solutions via the CLI or frontend:</p>
+        <div class="screenshot-container">
+        <img src="https://public.llmang.com/screenshots/home.png" alt="LLMang Frontend Home View" class="screenshot">
+        <img src="https://public.llmang.com/screenshots/create-solution.png" alt="LLMang Frontend Add Solution View" class="screenshot">
+        <img src="https://public.llmang.com/screenshots/goal.png" alt="LLMang Frontend Goal View" class="screenshot">
+        </div>
+        <div class="image-wrapper">
+            <img class="truck-image" src="https://public.llmang.com/logos/mang-truck.png"/>
+        </div>
+    </section>
+
+    <section id="get-started" class="container">
+        <h2>Get Started</h2>
+        <p>LLMang will soon be available on GitHub. Check out the repository for installation instructions, tutorials, and more!</p>
+        <ul style="list-style-type: none; margin: 1.5rem 0;">
+            <li><a href="https://github.com/llmang" style="color: var(--primary); text-decoration: none; display: flex; align-items: center; margin-bottom: 0.8rem;">
+                <svg height="24" width="24" viewBox="0 0 16 16" style="margin-right: 0.5rem;"><path fill="currentColor" d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"></path></svg>
+                github.com/llmang
+            </a></li>
+            <li><a href="https://github.com/llmang/llmango" style="color: var(--primary); text-decoration: none; display: flex; align-items: center;">
+                <svg height="24" width="24" viewBox="0 0 16 16" style="margin-right: 0.5rem;"><path fill="currentColor" d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"></path></svg>
+                github.com/llmang/llmango
+            </a></li>
+        </ul>
+        <p>Visit <a href="https://llmang.com" style="color: var(--primary);">llmang.com</a> for updates and documentation.</p>
+    </section>
+
+    <footer>
+        <div class="container">
+            <p>&copy; 2025 LLMang. Built by <a class="carsho-link" href="https://carsho.dev">carsho</a> for 💪 devs.</p>
+        </div>
+    </footer>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-go.min.js"></script>
+</body>
+</html>
