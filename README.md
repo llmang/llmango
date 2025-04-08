@@ -1,6 +1,8 @@
 # LLMang
 [llmang.com](https://llmang.com)
 
+Hardcode Goals, Not Prompts
+
 Goal-driven LLM framework for Go. By [Carson](https://carsho.dev).
 
 ## What It Does
