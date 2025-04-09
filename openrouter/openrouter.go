@@ -94,13 +94,13 @@ type Parameters struct {
 	Tools []struct {
 		Type     string `json:"type"` // Should be "function"
 		Function struct {
-			Description *string                `json:"description,omitempty"`
-			Name        string                 `json:"name"`
-			Parameters  map[string]interface{} `json:"parameters"` // JSON Schema object
+			Description *string        `json:"description,omitempty"`
+			Name        string         `json:"name"`
+			Parameters  map[string]any `json:"parameters"` // JSON Schema object
 		} `json:"function"`
 	} `json:"tools,omitempty"`
 
-	ToolChoice interface{} `json:"tool_choice,omitempty"` // "none", "auto", or {"type": "function", "function": {"name": "..."}}
+	ToolChoice any `json:"tool_choice,omitempty"` // "none", "auto", or {"type": "function", "function": {"name": "..."}}
 
 	// LLM Parameters (Optional)
 	Temperature       *float64        `json:"temperature,omitempty"`        // Range: [0, 2]
@@ -188,9 +188,9 @@ type BaseChoice struct {
 	FinishReason       *string   `json:"finish_reason"`        // "stop", "length", "tool_calls", etc. or null
 	NativeFinishReason *string   `json:"native_finish_reason"` // Provider-specific reason or null
 	Error              *struct { // Optional error details for this specific choice
-		Code     int                    `json:"code"`
-		Message  string                 `json:"message"`
-		Metadata map[string]interface{} `json:"metadata,omitempty"`
+		Code     int            `json:"code"`
+		Message  string         `json:"message"`
+		Metadata map[string]any `json:"metadata,omitempty"`
 	} `json:"error,omitempty"`
 }
 

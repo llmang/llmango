@@ -56,9 +56,10 @@ type GoalInfo struct {
 // Do we want to add the ability to
 type Goal[Input any, Output any] struct {
 	GoalInfo
-	Validator     *func(Output) bool `json:"-"`
+	Validator     func(*Output) bool `json:"-"`
 	ExampleInput  Input              `json:"exampleInput"`
 	ExampleOutput Output             `json:"exampleOutput"`
+	Prompts       []Prompt           `json:"-"`
 }
 
 type Result[T any] struct {

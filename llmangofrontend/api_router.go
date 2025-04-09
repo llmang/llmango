@@ -44,6 +44,9 @@ func (router *Router) RegisterAPIRoutes(mux *http.ServeMux) {
 	apiMux.HandleFunc("GET /logs/goal/{goalID}", r.handleGetGoalLogs)
 	apiMux.HandleFunc("GET /logs/prompt/{promptID}", r.handleGetPromptLogs)
 
+	// Register API routes
+	mux.HandleFunc("DELETE /prompts/{promptID}", r.handleDeletePrompt)
+
 	// Mount the API router at /api path with StripPrefix
 	mux.Handle("/api/", http.StripPrefix("/api", apiMux))
 }
@@ -926,5 +929,50 @@ func (r *APIRouter) handleGetPromptLogs(w http.ResponseWriter, req *http.Request
 	sendJSONResponse(w, http.StatusOK, Response{
 		Success: true,
 		Data:    response,
+	})
+}
+
+// handleDeletePrompt handles the deletion of a prompt
+func (r *APIRouter) handleDeletePrompt(w http.ResponseWriter, req *http.Request) {
+	promptID := req.PathValue("promptID")
+	if promptID == "" {
+		http.Error(w, "Prompt ID is required", http.StatusBadRequest)
+		return
+	}
+
+	if r.LLMangoManager.Prompts == nil {
+		sendJSONResponse(w, http.StatusInternalServerError, Response{
+			Success: false,
+			Error:   "Prompts map not initialized",
+		})
+		return
+	}
+
+	// Check if prompt exists
+	if _, exists := r.LLMangoManager.Prompts[promptID]; !exists {
+		sendJSONResponse(w, http.StatusNotFound, Response{
+			Success: false,
+			Error:   "Prompt not found",
+		})
+		return
+	}
+
+	// Delete the prompt
+	delete(r.LLMangoManager.Prompts, promptID)
+
+	// Save state if SaveState function is set
+	if r.LLMangoManager.SaveState != nil {
+		if err := r.LLMangoManager.SaveState(); err != nil {
+			sendJSONResponse(w, http.StatusInternalServerError, Response{
+				Success: false,
+				Error:   fmt.Sprintf("Failed to save state after deleting prompt: %v", err),
+			})
+			return
+		}
+	}
+	// Return success response
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"success": true,
 	})
 }

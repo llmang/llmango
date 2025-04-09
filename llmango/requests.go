@@ -5,9 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"math/rand"
-	"reflect"
 	"regexp"
-	"strings"
 	"time"
 
 	"github.com/llmang/llmango/openrouter"
@@ -67,7 +65,7 @@ func Run[I, R any](l *LLMangoManager, g *Goal[I, R], input *I) (*R, error) {
 
 	//here we have to use a helper func to replace {{val}} with struct field vals
 	//we want to reflect the input vals into a map of string to val then loop over them and regex the prompt mesages for {{string}} where not /{{}} valid everything ofcourse
-	updatedMessages, err := InsertVariableValuesIntoPromptMessagesCopy(input, prompt.Messages)
+	updatedMessages, err := ParseMessages(input, prompt.Messages)
 	if err != nil {
 		return nil, fmt.Errorf("failed to update prompt messages with err: %w", err)
 	}
@@ -174,61 +172,4 @@ func Run[I, R any](l *LLMangoManager, g *Goal[I, R], input *I) (*R, error) {
 	}
 
 	return &res, nil
-}
-
-func InsertVariableValuesIntoPromptMessagesCopy(input any, messages []openrouter.Message) ([]openrouter.Message, error) {
-	// Create a deep copy of messages to avoid modifying original
-	copiedMessages := make([]openrouter.Message, len(messages))
-	for i, msg := range messages {
-		copiedMessages[i] = openrouter.Message{
-			Role:    msg.Role,
-			Content: msg.Content,
-		}
-	}
-
-	// Convert input to map of field names to values
-	inputMap := make(map[string]string)
-	v := reflect.ValueOf(input)
-	if v.Kind() == reflect.Ptr {
-		v = v.Elem()
-	}
-	if v.Kind() != reflect.Struct {
-		return nil, fmt.Errorf("input must be a struct or pointer to struct")
-	}
-
-	t := v.Type()
-	for i := range v.NumField() {
-		field := t.Field(i)
-		value := v.Field(i)
-		// Get JSON tag name, fall back to field name
-		tag := field.Tag.Get("json")
-		if tag == "" || tag == "-" {
-			tag = field.Name
-		} else {
-			// Handle json tag options like "omitempty"
-			if commaIdx := strings.Index(tag, ","); commaIdx != -1 {
-				tag = tag[:commaIdx]
-			}
-		}
-		// Convert value to string
-		inputMap[tag] = fmt.Sprintf("%v", value.Interface())
-	}
-
-	// Regex pattern to match {{variable}} but not /{{variable}}
-	pattern := regexp.MustCompile(`\{\{([^{}]+)\}\}`)
-
-	// Process each copied message
-	for i, msg := range copiedMessages {
-		// Replace matches in message content
-		copiedMessages[i].Content = pattern.ReplaceAllStringFunc(msg.Content, func(match string) string {
-			// Extract variable name
-			varName := match[2 : len(match)-2]
-			if val, ok := inputMap[varName]; ok {
-				return val
-			}
-			return match // Return original if not found
-		})
-	}
-
-	return copiedMessages, nil
 }

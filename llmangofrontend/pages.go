@@ -5,6 +5,13 @@ import (
 	"net/http"
 )
 
+func (r *Router) handleTestsPage(w http.ResponseWriter, req *http.Request) {
+	data := GoalsPageData{
+		Goals: r.Goals,
+	}
+	r.renderTemplate(w, "tests", data)
+}
+
 // handleHomePage serves the home page
 func (r *Router) handleHomePage(w http.ResponseWriter, req *http.Request) {
 	data := HomePageData{
