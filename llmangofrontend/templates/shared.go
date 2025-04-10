@@ -506,24 +506,31 @@ const SharedTemplates = `
     {{template "styles"}}
 </head>
 <body>
-    <h1>LLMango</h1>
-    <nav>
-        <a href="{{.BaseRoute}}/">Home</a>
-        <a href="{{.BaseRoute}}/prompts">Prompts</a>
-        <a href="{{.BaseRoute}}/goals">Goals</a>
-        <a href="{{.BaseRoute}}/models">Models</a>
-        <a href="{{.BaseRoute}}/logs">Logs</a>
-        <span x-data>
-            <span 
-                x-show="$store.modelStore.hasModels" 
-                title="OpenRouter models loaded"
-                style="color: green; cursor: default;">✓</span>
-            <span 
-                @click="if(confirm('Refresh OpenRouter models?')) $store.modelStore.fetchModels(true)" 
-                title="Refresh OpenRouter models"
-                style="cursor: pointer; margin-left: 5px;">🔄</span>
-        </span>
-    </nav>
+    <div style="position: relative;">
+        <img src="https://public.llmang.com/logos/llmango.png" alt="LLMango Logo" style="position: absolute; top: 0; right: 0; height: 3rem;">
+        <h1>LLMango</h1>
+        <nav>
+            <a href="{{.BaseRoute}}/">Home</a>
+            <a href="{{.BaseRoute}}/prompts">Prompts</a>
+            <a href="{{.BaseRoute}}/goals">Goals</a>
+            <a href="{{.BaseRoute}}/models">Models</a>
+            <a href="{{.BaseRoute}}/logs">Logs</a>
+            <a>|</a>
+            <a>Chat</a>
+            <a>Evaluate</a>
+            <a></a>
+            <span x-data>
+                <span 
+                    x-show="$store.modelStore.hasModels" 
+                    title="OpenRouter models loaded"
+                    style="color: green; cursor: default;">models loaded ✓</span>
+                <span 
+                    @click="if(confirm('Refresh OpenRouter models?')) $store.modelStore.fetchModels(true)" 
+                    title="Refresh OpenRouter models"
+                    style="cursor: pointer; margin-left: 5px;">🔄</span>
+            </span>
+        </nav>
+    </div>
 {{end}}
 
 {{define "footer"}}

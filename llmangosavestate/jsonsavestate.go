@@ -15,7 +15,7 @@ type mangoConfigFile struct {
 	Prompts      map[string]*llmango.Prompt   `json:"prompts"`
 }
 
-func JSONSaveStateFunc(mango *llmango.LLMangoManager, fileName string) error {
+func jsonSaveStateFunc(mango *llmango.LLMangoManager, fileName string) error {
 	writeObject := struct {
 		Goals   map[string]any             `json:"goals"`
 		Prompts map[string]*llmango.Prompt `json:"prompts"`
@@ -45,7 +45,7 @@ func WithJSONSaveState(fileName string, mango *llmango.LLMangoManager) (*llmango
 
 	//setup savestate Func
 	var saveStateFunc func() error = func() error {
-		return JSONSaveStateFunc(mango, fileName)
+		return jsonSaveStateFunc(mango, fileName)
 	}
 	mango.SaveState = saveStateFunc
 
@@ -107,13 +107,13 @@ func WithJSONSaveState(fileName string, mango *llmango.LLMangoManager) (*llmango
 
 	maps.Copy(mango.Prompts, config.Prompts)
 
-	LoadConfig(mango, config.Goals)
+	loadConfig(mango, config.Goals)
 
 	return mango, nil
 }
 
 // this will parse the config if there currently is one and load the prompts and solutions into the object
-func LoadConfig(m *llmango.LLMangoManager, fileGoalsInfo map[string]*llmango.GoalInfo) error {
+func loadConfig(m *llmango.LLMangoManager, fileGoalsInfo map[string]*llmango.GoalInfo) error {
 	if fileGoalsInfo == nil {
 		return nil
 	}
@@ -139,8 +139,12 @@ func LoadConfig(m *llmango.LLMangoManager, fileGoalsInfo map[string]*llmango.Goa
 			if goal.Solutions == nil {
 				goal.Solutions = make(map[string]*llmango.Solution)
 			}
-			maps.Copy(goal.Solutions, info.Solutions)
+			if info.Solutions != nil {
+				maps.Copy(goal.Solutions, info.Solutions)
+			}
 		}
+		return nil
 	}
+
 	return nil
 }

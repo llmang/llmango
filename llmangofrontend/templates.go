@@ -54,7 +54,30 @@ func init() {
 				return result
 			}
 
-			// If type assertion fails, try to extract data using reflection
+			// Try direct marshaling to see if that works better with generics
+			if goalJSON, err := json.Marshal(goalAny); err == nil {
+				var result map[string]interface{}
+				if err := json.Unmarshal(goalJSON, &result); err == nil {
+					// Make sure it has key fields expected by templates
+					if _, hasTitle := result["title"]; hasTitle {
+						result["Title"] = result["title"]
+					}
+					if _, hasDesc := result["description"]; hasDesc {
+						result["Description"] = result["description"]
+					}
+					if _, hasUID := result["UID"]; hasUID {
+						// It's already capitalized, good
+					} else if _, hasUID := result["uid"]; hasUID {
+						result["UID"] = result["uid"]
+					}
+					if _, hasSolutions := result["solutions"]; hasSolutions {
+						result["Solutions"] = result["solutions"]
+					}
+					return result
+				}
+			}
+
+			// If marshaling fails, fall back to reflection
 			v := reflect.ValueOf(goalAny)
 
 			// If it's a pointer, get the value it points to
@@ -99,6 +122,27 @@ func init() {
 				} else {
 					result["Solutions"] = make(map[string]*llmango.Solution)
 				}
+			} else {
+				// Try to access fields directly on the struct (they might not be in an embedded GoalInfo)
+				title := v.FieldByName("Title")
+				if title.IsValid() {
+					result["Title"] = title.String()
+				}
+
+				desc := v.FieldByName("Description")
+				if desc.IsValid() {
+					result["Description"] = desc.String()
+				}
+
+				uid := v.FieldByName("UID")
+				if uid.IsValid() {
+					result["UID"] = uid.String()
+				}
+
+				solutions := v.FieldByName("Solutions")
+				if solutions.IsValid() {
+					result["Solutions"] = solutions.Interface()
+				}
 			}
 
 			// Try to extract example input and output fields
@@ -125,6 +169,10 @@ func init() {
 
 			if _, hasDesc := result["Description"]; !hasDesc {
 				result["Description"] = "Goal information unavailable"
+			}
+
+			if _, hasSolutions := result["Solutions"]; !hasSolutions {
+				result["Solutions"] = make(map[string]*llmango.Solution)
 			}
 
 			return result
