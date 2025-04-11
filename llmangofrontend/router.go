@@ -39,7 +39,11 @@ func CreateLLMMangRouter(l *llmango.LLMangoManager, baseRoute *string) http.Hand
 	mux.HandleFunc("GET /goal/{goalID}/newprompt", router.handleNewPromptForGoalPage)
 	mux.HandleFunc("GET /goal/{goalID}", router.handleGoalDetailPage)
 
+	// Register API routes
 	router.RegisterAPIRoutes(mux)
+
+	// Register templ-based routes (for the new template system)
+	router.RegisterTemplRoutes(mux)
 
 	// Apply the middlewares to the mux
 	return router.apiKeyMiddleware(

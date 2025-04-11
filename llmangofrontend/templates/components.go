@@ -33,7 +33,7 @@ const ComponentTemplates = `
     </a>
 {{end}}
 
-{{define "prompt-card"}}
+{{define "card"}}
     <a href="{{$.BaseRoute}}/prompt/{{.ID}}" class="card clickable" style="display: block; text-decoration: none; color: inherit; transition: transform 0.2s, box-shadow 0.2s;">
         <div class="model-badge">{{.Prompt.Model}}</div>
         {{if gt (len .Prompt.Messages) 0}}
@@ -137,7 +137,7 @@ const ComponentTemplates = `
         color: #333;
     }
     
-    .new-prompt-card {
+    .new-card {
         border: 1px dashed #aaa;
         background-color: #f9f9f9;
         display: flex;

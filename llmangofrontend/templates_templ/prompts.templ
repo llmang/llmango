@@ -1,0 +1,590 @@
+package templates_templ
+
+import (
+	"fmt"
+	"github.com/llmang/llmango/llmango"
+	"encoding/json"
+)
+
+// PromptsPage displays a list of all prompts
+templ PromptsPage(prompts map[string]*llmango.Prompt, baseRoute string) {
+	@Layout("Prompts", baseRoute) {
+	<div x-data="{createPromptOpen:false}">
+		<h2>Prompts</h2>
+		<div class="card-container">
+			for id, prompt := range prompts {
+				@PromptCard(id, prompt, baseRoute)
+			}
+			@NewItemCard("Add new prompt", "createPromptOpen=open")
+		</div>
+		
+		@CardStyles()
+		@JSONFormatter()
+		@CreatePromptModal("createPromptOpen")
+		@PromptStyles()
+	</div>
+	}
+}
+
+
+// PromptCard displays a prompt card with details and links
+templ PromptCard(id string, prompt *llmango.Prompt, baseRoute string) {
+	<a href={ safeURL(baseRoute + "/prompt/" + id) } class="card clickable card-link">
+		<div class="model-badge">{ prompt.Model }</div>
+		if len(prompt.Messages) > 0 {
+			<p class="truncate-text message-preview">{ getMessageContent(prompt.Messages[0]) }</p>
+		} else {
+			<p class="message-preview">No messages</p>
+		}
+		<div class="card-footer">
+			<p class="message-count">Messages: { fmt.Sprintf("%d", len(prompt.Messages)) }</p>
+			<p class="card-footer-id">ID: { id }</p>
+		</div>
+	</a>
+}
+
+
+
+// PromptDetailPage displays details for a specific prompt
+templ PromptDetailPage(promptUID string, prompt *llmango.Prompt, baseRoute string) {
+	@Layout("Prompt", baseRoute) {
+	<div x-data="{
+	    warningOpen:false,
+		editPromptOpen:false,
+		promptData: null,
+		
+		// Functions
+		getPromptData() {
+			try {
+				this.promptData = JSON.parse(document.getElementById('prompt-data').textContent);
+			} catch (e) {
+				console.error('Error parsing prompt data:', e);
+			}
+		},
+		
+		fillEditForm() {
+			if (!this.promptData) return;
+			
+			document.getElementById('edit-model').value = this.promptData.model || '';
+			
+			if (this.promptData.parameters) {
+				document.getElementById('edit-temperature').value = this.promptData.parameters.temperature || '';
+				document.getElementById('edit-max-tokens').value = this.promptData.parameters.max_tokens || '';
+				document.getElementById('edit-top-p').value = this.promptData.parameters.top_p || '';
+				document.getElementById('edit-frequency-penalty').value = this.promptData.parameters.frequency_penalty || '';
+				document.getElementById('edit-presence-penalty').value = this.promptData.parameters.presence_penalty || '';
+			}
+		},
+		
+		deletePrompt() {
+			if (!confirm('⚠️ Are you sure you want to delete this prompt? This action cannot be undone and may affect existing solutions.')) {
+				return;
+			}
+			
+			fetch(`/api/prompts/${ promptUID }/delete`, {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' }
+			})
+			.then(response => response.json())
+			.then(data => {
+				if (data.success) {
+					window.location.href = '/prompts';
+				} else {
+					alert('Error: ' + data.error);
+				}
+			})
+			.catch(error => {
+				alert('Error: ' + error);
+			});
+		},
+		
+		updatePrompt() {
+			const getNumberValue = (id) => {
+				const value = document.getElementById(id).value;
+				return value === '' ? null : parseFloat(value);
+			};
+			
+			const model = document.getElementById('edit-model').value;
+			const parameters = {};
+			
+			const temperature = getNumberValue('edit-temperature');
+			const maxTokens = getNumberValue('edit-max-tokens');
+			const topP = getNumberValue('edit-top-p');
+			const frequencyPenalty = getNumberValue('edit-frequency-penalty');
+			const presencePenalty = getNumberValue('edit-presence-penalty');
+			
+			if (temperature !== null) parameters.temperature = temperature;
+			if (maxTokens !== null) parameters.max_tokens = maxTokens;
+			if (topP !== null) parameters.top_p = topP;
+			if (frequencyPenalty !== null) parameters.frequency_penalty = frequencyPenalty;
+			if (presencePenalty !== null) parameters.presence_penalty = presencePenalty;
+			
+			const prompt = {
+				model: model,
+				parameters: parameters
+			};
+			
+			if (!confirm('⚠️ Are you sure you want to update this prompt? This action cannot be undone and may affect existing solutions.')) {
+				return;
+			}
+			
+			fetch(`/api/prompts/${ promptUID }/update`, {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify(prompt)
+			})
+			.then(response => response.json())
+			.then(data => {
+				if (data.success) {
+					window.location.reload();
+				} else {
+					alert('Error: ' + data.error);
+				}
+			})
+			.catch(error => {
+				alert('Error: ' + error);
+			});
+		}
+	}"
+	x-init="getPromptData()">
+		<h2>Prompt: { prompt.UID }</h2>
+		
+		<div class="card">
+			<div class="card-header">
+				<h3>Details</h3>
+			</div>
+			
+			<div class="model-badge">{ prompt.Model }</div>
+			
+			<h4>Parameters:</h4>
+			<div class="json-preview">{ fmt.Sprintf("%v", prompt.Parameters) }</div>
+			
+			<h4>Messages:</h4>
+			for _, message := range prompt.Messages {
+				<div class="message-card">
+					<p class="message-role">{ message.Role }</p>
+					<pre class="message-content">{ message.Content }</pre>
+				</div>
+			}
+			
+			<details class="prompt-debug">
+				<summary>Debug Info</summary>
+				<pre>{ fmt.Sprintf("%#v", prompt) }</pre>
+			</details>
+			
+			<details class="unsafe-actions">
+				<summary>⚠️ Unsafe Actions</summary>
+				<div class="unsafe-actions-content">
+					<p class="warning-text">These actions may affect data consistency and cannot be undone. Use with caution.</p>
+					<div class="unsafe-buttons">
+						<button 
+							class="btn btn-warning" 
+							@click="Alpine.store('warning', true)"
+						>
+							⚠️ Edit Prompt
+						</button>
+						<button 
+							class="btn btn-danger" 
+							@click="deletePrompt()"
+						>
+							⚠️ Delete Prompt
+						</button>
+					</div>
+				</div>
+			</details>
+			
+			<!-- Store prompt data for JavaScript access -->
+			<script id="prompt-data" type="application/json">
+				@promptDataJSON(prompt)
+			</script>
+		</div>
+		
+		@PromptStyles()
+		@JSONFormatter()
+		@EditPromptModal(promptUID, "editPromptOpen")
+		@WarningModal(promptUID, "warningOpen")
+	</div>
+	}
+}
+
+// Helper to render prompt data as JSON
+templ promptDataJSON(prompt *llmango.Prompt) {
+	if data, err := json.Marshal(prompt); err == nil {
+		{ string(data) }
+	} else {
+		{}
+	}
+}
+
+// EditPromptModal component for editing an existing prompt
+templ EditPromptModal(promptUID string, openVar string) {
+	@Modal("Edit Prompt", openVar) {
+		<div class="warning-section">
+			<h4>⚠️ Warning: Data Consistency Risk</h4>
+			<p>Editing this prompt may affect existing solutions and goals that use it. Please ensure you understand the implications before proceeding.</p>
+		</div>
+
+		<form id="edit-prompt-form">
+			<div class="form-group">
+				<label for="edit-model">Model</label>
+				<input type="text" id="edit-model" class="form-control" />
+			</div>
+
+			<div class="form-group">
+				<label>Parameters</label>
+				<div class="parameters-grid">
+					<div class="parameter-item">
+						<label for="edit-temperature">Temperature</label>
+						<input type="number" id="edit-temperature" class="form-control" step="0.1" min="0" max="2" />
+					</div>
+					<div class="parameter-item">
+						<label for="edit-max-tokens">Max Tokens</label>
+						<input type="number" id="edit-max-tokens" class="form-control" min="1" />
+					</div>
+					<div class="parameter-item">
+						<label for="edit-top-p">Top P</label>
+						<input type="number" id="edit-top-p" class="form-control" step="0.1" min="0" max="1" />
+					</div>
+					<div class="parameter-item">
+						<label for="edit-frequency-penalty">Frequency Penalty</label>
+						<input type="number" id="edit-frequency-penalty" class="form-control" step="0.1" min="-2" max="2" />
+					</div>
+					<div class="parameter-item">
+						<label for="edit-presence-penalty">Presence Penalty</label>
+						<input type="number" id="edit-presence-penalty" class="form-control" step="0.1" min="-2" max="2" />
+					</div>
+				</div>
+			</div>
+		</form>
+	}
+}
+
+// WarningModal component for displaying confirmation dialog
+templ WarningModal(promptUID string, openVar string) {
+	@Modal("Warning", openVar) {
+		<div class="warning-section">
+			<h4>⚠️ Data Consistency Risk</h4>
+			<p>Editing this prompt may affect existing solutions and goals that use it. This action cannot be undone.</p>
+			<p>Are you sure you want to proceed?</p>
+		</div>
+		<div class="modal-actions">
+			<button
+				type="button"
+				class="btn btn-primary"
+				@click="$data.fillEditForm(); open = false; Alpine.store('edit-prompt', true)"
+			>
+				⚠️ Proceed
+			</button>
+			<button
+				type="button"
+				class="btn btn-secondary"
+				@click="open = false"
+			>
+				Cancel
+			</button>
+		</div>
+	}
+}
+
+// CreatePromptModal component creates a new prompt
+templ CreatePromptModal(openVar string) {
+	@Modal("new-prompt", openVar) {
+		<form id="new-prompt-form" class="prompt-form" x-data="{model:null}">
+			<div class="form-group">
+				<label for="promptModel" class="form-label">Model</label>
+				<select id="promptModel" name="model" class="form-control" required>
+					<option value="">Select a model</option>
+					<option value="gpt-4">GPT-4</option>
+					<option value="gpt-3.5-turbo">GPT-3.5 Turbo</option>
+					<option value="claude-3-opus">Claude 3 Opus</option>
+					<option value="claude-3-sonnet">Claude 3 Sonnet</option>
+					<option value="claude-3-haiku">Claude 3 Haiku</option>
+					<option value="gemini-pro">Gemini Pro</option>
+					<option value="gemini-1.5-pro">Gemini 1.5 Pro</option>
+					<option value="llama-3-70b">Llama 3 70B</option>
+					<option value="mistral-large">Mistral Large</option>
+				</select>
+			</div>
+			
+			<div class="form-group">
+				<label for="promptTemperature" class="form-label">Temperature</label>
+				<input type="number" id="promptTemperature" name="temperature" class="form-control" min="0" max="2" step="0.1" value="0.7" required />
+			</div>
+			
+			<div class="form-group">
+				<label for="promptSystemMessage" class="form-label">System Message</label>
+				<textarea id="promptSystemMessage" name="system_message" class="form-control" rows="6" placeholder="Enter your system message here..." required></textarea>
+			</div>
+			
+			<div class="form-group">
+				<label for="promptUserMessage" class="form-label">User Message</label>
+				<textarea id="promptUserMessage" name="user_message" class="form-control" rows="6" placeholder="Enter the user message template here..." required></textarea>
+			</div>
+			
+			<div class="variables-box">
+				<p class="variables-help">You can use these variables in your prompt:</p>
+				<div class="available-variables">
+					<code>{"{{.Input}}"}</code> - The goal's input data
+				</div>
+			</div>
+		</form>
+		
+		<script>
+			function createNewPrompt() {
+				const form = document.getElementById('new-prompt-form');
+				if (!form.checkValidity()) {
+					form.reportValidity();
+					return;
+				}
+				
+				const model = document.getElementById('promptModel').value;
+				const temperature = parseFloat(document.getElementById('promptTemperature').value);
+				const systemMessage = document.getElementById('promptSystemMessage').value;
+				const userMessage = document.getElementById('promptUserMessage').value;
+				
+				const promptData = {
+					model: model,
+					parameters: {
+						temperature: temperature
+					},
+					messages: [
+						{
+							role: "system",
+							content: systemMessage
+						},
+						{
+							role: "user",
+							content: userMessage
+						}
+					]
+				};
+				
+				// Send the prompt data to the server
+				fetch('/api/prompts', {
+					method: 'POST',
+					headers: {
+						'Content-Type': 'application/json'
+					},
+					body: JSON.stringify(promptData)
+				})
+				.then(response => response.json())
+				.then(data => {
+					console.log('Success:', data);
+					Alpine.data({{openVar}},false)
+					window.location.reload();
+				})
+				.catch(error => {
+					console.error('Error:', error);
+					alert('Failed to create prompt');
+				});
+			}
+		</script>
+	}
+}
+
+// PromptStyles component contains CSS styles for prompt components
+templ PromptStyles() {
+	<style>
+
+		
+		.prompt-title {
+			margin-top: 0;
+			margin-bottom: 10px;
+			white-space: nowrap;
+			overflow: hidden;
+			text-overflow: ellipsis;
+			font-size: 1.1rem;
+		}
+		
+		.prompt-meta {
+			display: flex;
+			flex-direction: column;
+			gap: 8px;
+		}
+		
+		.model-badge {
+			display: inline-block;
+			background: #e6f3ff;
+			padding: 4px 8px;
+			border-radius: 4px;
+			font-size: 0.9rem;
+			margin-bottom: 15px;
+		}
+		
+		.model-badge.small {
+			font-size: 0.75rem;
+			padding: 2px 6px;
+			display: inline-block;
+		}
+		
+		.message-count {
+			font-size: 0.8rem;
+			color: #666;
+		}
+		
+		.message-preview {
+			margin-top: 10px;
+			border-top: 1px solid #eee;
+			padding-top: 10px;
+		}
+		
+		.preview-label {
+			font-size: 0.75rem;
+			color: #666;
+			margin-bottom: 3px;
+		}
+		
+		.preview-content {
+			font-size: 0.8rem;
+			color: #333;
+			display: -webkit-box;
+			-webkit-line-clamp: 3;
+			-webkit-box-orient: vertical;
+			overflow: hidden;
+			text-overflow: ellipsis;
+			max-height: 4.5em;
+			font-family: monospace;
+			background-color: #f8f8f8;
+			padding: 5px;
+			border-radius: 3px;
+			line-height: 1.5;
+			word-break: break-word;
+		}
+		
+		/* Variables box styles */
+		.variables-box {
+			background-color: #f8f8ff;
+			border: 1px solid #e0e0ff;
+			border-radius: 4px;
+			padding: 10px;
+			margin-bottom: 15px;
+		}
+		
+		.variables-help {
+			margin-top: 0;
+			margin-bottom: 10px;
+			font-size: 0.9rem;
+			color: #555;
+		}
+		
+		.available-variables code {
+			background-color: #eef;
+			padding: 2px 4px;
+			border-radius: 3px;
+			font-family: monospace;
+		}
+		
+		.message-card {
+			margin-bottom: 15px;
+			padding: 1rem;
+			border: 1px solid #ddd;
+			border-radius: 0.5rem;
+		}
+		
+		.message-role {
+			font-weight: 600;
+			margin-top: 0;
+			margin-bottom: 0.5rem;
+			color: #555;
+		}
+		
+		.message-content {
+			margin: 0;
+			white-space: pre-wrap;
+			overflow-x: auto;
+			font-family: monospace;
+			font-size: 0.9rem;
+			background-color: #f8f8f8;
+			padding: 0.75rem;
+			border-radius: 0.25rem;
+		}
+		
+		.prompt-debug {
+			margin-top: 2rem;
+			border-top: 1px solid #eee;
+			padding-top: 0.5rem;
+		}
+		
+		.prompt-debug summary {
+			cursor: pointer;
+			color: #666;
+			font-size: 0.8rem;
+		}
+		
+		.prompt-debug pre {
+			background: #f5f5f5;
+			padding: 0.5rem;
+			border-radius: 0.25rem;
+			overflow: auto;
+		}
+
+		.warning-section {
+			background-color: #fff3cd;
+			border: 1px solid #ffeeba;
+			border-radius: 0.5rem;
+			padding: 1.5rem;
+			margin-bottom: 1.5rem;
+		}
+
+		.warning-icon {
+			font-size: 2rem;
+			margin-bottom: 1rem;
+		}
+
+		.warning-section h4 {
+			color: #856404;
+			margin-top: 0;
+		}
+
+		.warning-section p {
+			color: #856404;
+			margin-bottom: 1rem;
+		}
+
+		.parameters-grid {
+			display: grid;
+			grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+			gap: 1rem;
+		}
+
+		.parameter-item {
+			display: flex;
+			flex-direction: column;
+			gap: 0.5rem;
+		}
+
+		.unsafe-actions {
+			margin-top: 1rem;
+			border-top: 1px solid #eee;
+			padding-top: 0.5rem;
+		}
+		
+		.unsafe-actions summary {
+			cursor: pointer;
+			color: #dc3545;
+			font-size: 0.8rem;
+			font-weight: 600;
+		}
+		
+		.unsafe-actions-content {
+			padding: 1rem;
+			background-color: #fff8f8;
+			border: 1px solid #ffd6d6;
+			border-radius: 0.25rem;
+			margin-top: 0.5rem;
+		}
+		
+		.modal-footer {
+			display: flex;
+			justify-content: flex-end;
+			gap: 0.5rem;
+			margin-top: 1rem;
+		}
+		
+
+		
+		.form-group {
+			margin-bottom: 1rem;
+		}
+	</style>
+}

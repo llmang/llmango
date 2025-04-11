@@ -1,0 +1,320 @@
+package templates_templ
+
+import (
+	"fmt"
+	"encoding/json"
+	"github.com/llmang/llmango/llmango"
+	"reflect"
+)
+
+
+
+// safeURL creates a templ.SafeURL from a string
+func safeURL(url string) templ.SafeURL {
+	return templ.SafeURL(url)
+}
+
+// Helper function to convert int to string
+func intToString(n int) string {
+	return fmt.Sprintf("%d", n)
+}
+
+// Helper function to convert object to JSON string
+func jsonStr(obj interface{}) string {
+	b, err := json.Marshal(obj)
+	if err != nil {
+		return "{}"
+	}
+	return string(b)
+}
+
+// Helper function to get goal information
+func getGoalInfo(goalAny any) map[string]interface{} {
+	// Try to get GoalInfo using type assertion first
+	if goal, ok := goalAny.(interface{ GetGoalInfo() *llmango.GoalInfo }); ok {
+		info := goal.GetGoalInfo()
+		result := map[string]interface{}{
+			"Title":       info.Title,
+			"Description": info.Description,
+			"UID":         info.UID,
+			"Solutions":   info.Solutions,
+		}
+		return result
+	}
+
+	// Try direct marshaling to see if that works better with generics
+	if goalJSON, err := json.Marshal(goalAny); err == nil {
+		var result map[string]interface{}
+		if err := json.Unmarshal(goalJSON, &result); err == nil {
+			// Make sure it has key fields expected by templates
+			if _, hasTitle := result["title"]; hasTitle {
+				result["Title"] = result["title"]
+			}
+			if _, hasDesc := result["description"]; hasDesc {
+				result["Description"] = result["description"]
+			}
+			if _, hasUID := result["UID"]; hasUID {
+				// It's already capitalized, good
+			} else if _, hasUID := result["uid"]; hasUID {
+				result["UID"] = result["uid"]
+			}
+			if _, hasSolutions := result["solutions"]; hasSolutions {
+				result["Solutions"] = result["solutions"]
+			}
+			return result
+		}
+	}
+
+	// If marshaling fails, fall back to reflection
+	v := reflect.ValueOf(goalAny)
+
+	// If it's a pointer, get the value it points to
+	if v.Kind() == reflect.Ptr {
+		v = v.Elem()
+	}
+
+	// Must be a struct to proceed
+	if v.Kind() != reflect.Struct {
+		return map[string]interface{}{
+			"Title":       "Unknown Goal",
+			"Description": "Goal information unavailable (not a struct)",
+			"Solutions":   make(map[string]*llmango.Solution),
+		}
+	}
+
+	// Build a map with the goal info
+	result := map[string]interface{}{}
+
+	// First, try to extract the embedded GoalInfo fields
+	goalInfoField := v.FieldByName("GoalInfo")
+	if goalInfoField.IsValid() {
+		// Extract fields from embedded GoalInfo
+		title := goalInfoField.FieldByName("Title")
+		if title.IsValid() {
+			result["Title"] = title.String()
+		}
+
+		desc := goalInfoField.FieldByName("Description")
+		if desc.IsValid() {
+			result["Description"] = desc.String()
+		}
+
+		uid := goalInfoField.FieldByName("UID")
+		if uid.IsValid() {
+			result["UID"] = uid.String()
+		}
+
+		solutions := goalInfoField.FieldByName("Solutions")
+		if solutions.IsValid() {
+			result["Solutions"] = solutions.Interface()
+		} else {
+			result["Solutions"] = make(map[string]*llmango.Solution)
+		}
+	} else {
+		// Try to access fields directly on the struct (they might not be in an embedded GoalInfo)
+		title := v.FieldByName("Title")
+		if title.IsValid() {
+			result["Title"] = title.String()
+		}
+
+		desc := v.FieldByName("Description")
+		if desc.IsValid() {
+			result["Description"] = desc.String()
+		}
+
+		uid := v.FieldByName("UID")
+		if uid.IsValid() {
+			result["UID"] = uid.String()
+		}
+
+		solutions := v.FieldByName("Solutions")
+		if solutions.IsValid() {
+			result["Solutions"] = solutions.Interface()
+		}
+	}
+
+	// Try to extract example input and output fields
+	exampleInput := v.FieldByName("ExampleInput")
+	if exampleInput.IsValid() {
+		inputJSON, err := json.Marshal(exampleInput.Interface())
+		if err == nil {
+			result["ExampleInput"] = string(inputJSON)
+		}
+	}
+
+	exampleOutput := v.FieldByName("ExampleOutput")
+	if exampleOutput.IsValid() {
+		outputJSON, err := json.Marshal(exampleOutput.Interface())
+		if err == nil {
+			result["ExampleOutput"] = string(outputJSON)
+		}
+	}
+
+	// If we couldn't extract title and description, use defaults
+	if _, hasTitle := result["Title"]; !hasTitle {
+		result["Title"] = "Unknown Goal"
+	}
+
+	if _, hasDesc := result["Description"]; !hasDesc {
+		result["Description"] = "Goal information unavailable"
+	}
+
+	if _, hasSolutions := result["Solutions"]; !hasSolutions {
+		result["Solutions"] = make(map[string]*llmango.Solution)
+	}
+
+	return result
+}
+
+// Styles component contains all general CSS styles for the application
+templ Styles() {
+	<style>
+		* {box-sizing:border-box;}
+		body { font-family: sans-serif; line-height: 1.6; padding: 20px; max-width: 900px; margin: auto; color: #333; }
+		h1, h2, h3 { color: #444; }
+		ul { list-style: none; padding: 0; }
+		li { background-color: #eee; margin-bottom: 5px; padding: 8px 12px; border-radius: 3px; }
+		hr { border: 0; height: 1px; background: #ddd; margin: 30px 0; }
+		code { background-color: #f0f0f0; padding: 2px 5px; border-radius: 3px; }
+		ol li { background-color: transparent; margin-bottom: 10px; padding: 0; }
+		nav { margin-bottom: 25px; border-bottom: 1px solid #eee; padding-bottom: 10px; }
+		nav a { margin-right: 15px; text-decoration: none; color: #007bff; }
+		nav a:hover { text-decoration: underline; }
+		button:hover{
+			filter:invert(.1);
+		}
+
+		.warning-text {
+			color: #dc3545;
+			margin-bottom: 1rem;
+			font-size: 0.9rem;
+		}
+		
+		.unsafe-buttons {
+			display: flex;
+			gap: 0.5rem;
+		}
+
+		    .btn {
+        padding: 0.5rem 1rem;
+        border-radius: 0.25rem;
+        border: none;
+        cursor: pointer;
+        font-size: 1rem;
+		}
+
+		.btn-primary {
+			background-color: #007bff;
+			color: white;
+		}
+
+		.btn-secondary {
+			color:black;
+			background-color: rgb(233, 239, 241);
+		}
+
+		.btn-warning {
+			background-color: #ffc107;
+			color: #000;
+		}
+		
+		.btn-danger {
+			background-color: #dc3545;
+			color: white;
+		}
+		.btn-sm {
+			padding: 0.25rem 0.5rem;
+			font-size: 0.875rem;
+		}
+
+		.loading {
+			text-align: center;
+			padding: 1rem;
+			color: #666;
+		}
+
+		pre { 
+			background: #f5f5f5; 
+			padding: 10px; 
+			border-radius: 4px; 
+			white-space: pre-wrap;
+			word-wrap: break-word;
+			word-break: break-word;
+			overflow-wrap: break-word;
+			max-width: 100%;
+		}
+			    .json-preview {
+			background-color: #f5f5f5;
+			border-radius: 0.25rem;
+			padding: 0.75rem;
+			font-family: monospace;
+			font-size: 0.8rem;
+			max-height: 200px;
+			overflow: auto;
+			white-space: pre-wrap;
+			margin-bottom: 1.5rem;
+			position: relative;
+			
+			/* Custom syntax highlighting */
+			color: #333;
+		}
+
+
+		.form-group {
+			margin-bottom: 1.5rem;
+		}
+
+		.form-control {
+			width: 100%;
+			padding: 0.5rem;
+			border: 1px solid #ddd;
+			border-radius: 0.25rem;
+			font-size: 1rem;
+    }
+
+
+
+		.json-key { color: #0057b7; }
+		.json-string { color: #008000; }
+		.json-number { color: #a31515; }
+		.json-boolean { color: #0000ff; }
+		.json-null { color: #808080; }
+	</style>
+}
+
+// JSONFormatter component includes the JavaScript for formatting JSON in previews
+templ JSONFormatter() {
+	<script>
+		document.addEventListener('DOMContentLoaded', function() {
+			// Format all JSON preview elements
+			document.querySelectorAll('.json-preview').forEach(function(element) {
+				try {
+					const jsonText = element.textContent;
+					const jsonData = JSON.parse(jsonText);
+					const formatted = JSON.stringify(jsonData, null, 2);
+					element.textContent = formatted;
+				} catch(e) {
+					// If parsing fails, keep the original content
+					console.error('JSON parse error:', e);
+				}
+			});
+		});
+	</script>
+	<style>
+		.json-key {
+			color: #a6e22e;
+		}
+		.json-string {
+			color: #f1fa8c;
+		}
+		.json-number {
+			color: #66d9ef;
+		}
+		.json-boolean {
+			color: #bd93f9;
+		}
+		.json-null {
+			color: #ff79c6;
+		}
+	</style>
+}

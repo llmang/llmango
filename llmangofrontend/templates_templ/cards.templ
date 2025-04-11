@@ -1,0 +1,137 @@
+package templates_templ
+
+import (
+	"fmt"
+)
+
+
+
+// NewItemCard displays a card for creating new items
+templ NewItemCard(title string, onclick string) {
+	<div class="card clickable new-card" @click={ onclick }>
+		<div class="new-prompt-content">
+			<div class="plus-icon">+</div>
+			<p>{ title }</p>
+		</div>
+	</div>
+}
+
+// Helper function to get message content
+func getMessageContent(message interface{}) string {
+	// Handle openrouter.Message type
+	switch m := message.(type) {
+	case map[string]interface{}:
+		if content, ok := m["content"]; ok {
+			return fmt.Sprintf("%v", content)
+		}
+	default:
+		// Try to access content field through reflection or handle the specific openrouter.Message type
+		// For now return a placeholder
+		return fmt.Sprintf("%v", m)
+	}
+	return "No content"
+}
+
+// CardStyles component contains CSS styles for card components
+templ CardStyles() {
+	<style>
+	.card-container{
+			display: grid;
+			grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+			gap:
+			1.5rem;
+			margin-bottom: 2rem;
+		}
+		
+		.card { 
+			border: 1px solid #ddd; 
+			border-radius: 5px; 
+			padding: 15px; 
+			min-width: 150px; 
+			box-shadow: 0 2px 4px rgba(0,0,0,0.1); 
+		}
+		
+		.card h3 { 
+			margin-top: 0; 
+		}
+		
+		.clickable {
+			cursor: pointer;
+			transition: transform 0.2s, box-shadow 0.2s;
+		}
+		
+		.clickable:hover {
+			transform: translateY(-2px);
+			box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+		}
+		
+		.plus-icon {
+			font-size: 24px;
+			margin-bottom: 10px;
+		}
+		
+		.examples-grid {
+			margin-top: 10px;
+		}
+		
+		.example-section {
+			margin-bottom: 10px;
+		}
+		
+		.example-title {
+			margin-top: 0;
+			margin-bottom: 5px;
+			font-size: 0.9rem;
+		}
+
+		.card-link {
+			display: block;
+			text-decoration: none;
+			color: inherit;
+			transition: transform 0.2s, box-shadow 0.2s;
+		}
+
+		.card-header {
+			display: flex;
+			justify-content: space-between;
+			align-items: center;
+			margin-bottom: 1rem;
+		}
+
+		.truncate-text {
+			display: -webkit-box;
+			-webkit-line-clamp: 3;
+			-webkit-box-orient: vertical;
+			overflow: hidden;
+			text-overflow: ellipsis;
+		}
+
+		.card-footer-id {
+			font-size: 0.8rem;
+			margin-top: auto;
+			white-space: nowrap;
+			overflow: hidden;
+			text-overflow: ellipsis;
+			color: #666;
+		}
+
+		.message-preview {
+			margin-bottom: 1rem;
+		}
+
+		.card-footer {
+			display: flex;
+			justify-content: space-between;
+			margin-top: auto;
+		}
+
+		.message-count {
+			font-size: 0.8rem;
+			color: #666;
+		}
+
+		.new-card {
+			cursor: pointer;
+		}
+	</style>
+}

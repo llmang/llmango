@@ -1,0 +1,39 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+# tech stack
+Go 1.24+ (golang)
+templ Templates, alpine.js,
+
+## notable packages
+net/http 1.22+ router UPDATED version
+
+### notable providers
+We use openrouter for our llm queries and a custom openrouter package to interact with it.
+
+### Project goals
+Make a LLM goals manager that allows the user to use golang objects to generate output from llm both sturctured and unstructured chat messages, it includes:
+1. Ability for the user to define Goals which are generics which have input and output types
+2. Auto generated json config that we can update to add prompts and solutions
+3. Prompts consist of message arrays which can have user and assistant messages along with the model name (we use openrouter for our models/llm system)
+4. Prompts and Goals have UID which identify them
+5. Goals can have solutions attached to them
+6. Solutions are Prompt+Options about usage (weight, isCanary, maxRuns, currentRuns)
+7. Weight is used to determine which Solution(prompt) gets used when a goal runnign functions occurs
+
+#### CLI aspect/ project structure
+There are 4 parts to the project
+1. Openrouter package - contains our logic for interacting with openrouter
+2. llmango package- contains our logic for Goals, Prompts and how we construct llm queries for openrouter given our generic inputs/outputs- This is an external package meaning it can be used in ANYONEs project/can be imported by anyone. Also default logging information is stored here.
+3. mango package - This is an interal package that is where the user defines project specific functionality goals. Part of this package can be genreated using the CLI tool to get type safe functions mango.UseGoal1 mango.UseGoalFindBestPlace etc. This is project specific 
+4. llmango frontend - This is a frontend package written entirely in golang using templ templates and alpine that allows the user to setup a router on a specific route /mango/ for instance and then they have a frontend UI for editting goal title/descriptoin, for adding/changing solutions and prompts, for editing/viewing logs and canary tests. 
+
+### end goal
+
+Once we finish this package we will convert all our prompts into llmango goals so that we can easily test them and create canaries etc. 
+
+   
+
+

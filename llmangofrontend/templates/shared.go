@@ -18,6 +18,7 @@ const SharedTemplates = `
     nav { margin-bottom: 25px; border-bottom: 1px solid #eee; padding-bottom: 10px; }
     nav a { margin-right: 15px; text-decoration: none; color: #007bff; }
     nav a:hover { text-decoration: underline; }
+    a{ text-decoration:none;}
     pre { 
         background: #f5f5f5; 
         padding: 10px; 
@@ -276,12 +277,8 @@ const SharedTemplates = `
         overflow: auto;
     }
     
-    .prompt-card {
-        width: 220px;
-        transition: transform 0.2s, box-shadow 0.2s;
-    }
-    
-    .prompt-card:hover {
+
+    .card:hover {
         transform: translateY(-2px);
         box-shadow: 0 4px 8px rgba(0,0,0,0.1);
     }
@@ -711,7 +708,7 @@ const SharedTemplates = `
         margin-bottom: 20px;
     }
     
-    .new-prompt-card {
+    .new-card {
         width: 200px;
         height: 150px;
         display: flex;

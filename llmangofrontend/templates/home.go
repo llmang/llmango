@@ -29,7 +29,7 @@ const HomeTemplate = `
         {{$count := 0}}
         {{range $id, $prompt := .Prompts}}
             {{if lt $count 3}}
-                {{template "prompt-card" dict "ID" $id "Prompt" $prompt "BaseRoute" $.BaseRoute}}
+                {{template "card" dict "ID" $id "Prompt" $prompt "BaseRoute" $.BaseRoute}}
                 {{$count = inc $count}}
             {{end}}
         {{else}}

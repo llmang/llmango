@@ -69,7 +69,7 @@ const PromptsTemplates = `
     >
         <div class="card-container">
             <!-- Add New Prompt Button Card -->
-            <div class="card new-prompt-card clickable"
+            <div class="card new-card clickable"
                 @click="showNewPromptModal = true">
                 <div class="new-prompt-content">
                     <div class="plus-icon">+</div>
@@ -79,7 +79,7 @@ const PromptsTemplates = `
             
             <!-- Existing Prompts -->
             {{range $id, $prompt := .Prompts}}
-                {{template "prompt-card" dict "ID" $id "Prompt" $prompt "BaseRoute" $.BaseRoute}}
+                {{template "card" dict "ID" $id "Prompt" $prompt "BaseRoute" $.BaseRoute}}
             {{else}}
                 <p>No prompts available</p>
             {{end}}
@@ -233,8 +233,8 @@ const PromptsTemplates = `
 {{template "footer"}}
 {{end}}
 
-{{define "prompt-card"}}
-<div class="card prompt-card clickable" onclick="window.location.href='{{.BaseRoute}}/prompt/{{.ID}}'">
+{{define "card"}}
+<div class="card card clickable" onclick="window.location.href='{{.BaseRoute}}/prompt/{{.ID}}'">
     <h3 class="prompt-title">{{.Prompt.UID}}</h3>
     <div class="prompt-meta">
         <span class="model-badge small">{{.Prompt.Model}}</span>
