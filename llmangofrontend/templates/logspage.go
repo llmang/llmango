@@ -17,7 +17,7 @@ const LogsPageTemplate = `
             isLoading: false,
             filterOptions: {
                 goalId: null,
-                promptId: null,
+                promptUID: null,
                 perPage: 10
             },
             goals: [],
@@ -36,8 +36,8 @@ const LogsPageTemplate = `
                     if (this.filterOptions.goalId) {
                         params.append('goalId', this.filterOptions.goalId);
                     }
-                    if (this.filterOptions.promptId) {
-                        params.append('promptId', this.filterOptions.promptId);
+                    if (this.filterOptions.promptUID) {
+                        params.append('promptUID', this.filterOptions.promptUID);
                     }
                     
                     const response = await fetch(url + '?' + params.toString());
@@ -89,7 +89,7 @@ const LogsPageTemplate = `
             resetFilters() {
                 this.filterOptions = {
                     goalId: null,
-                    promptId: null,
+                    promptUID: null,
                     perPage: 10
                 };
                 this.currentPage = 1;
@@ -114,10 +114,10 @@ const LogsPageTemplate = `
                 
                 <div class="filter-group">
                     <label for="promptFilter">Prompt:</label>
-                    <select id="promptFilter" x-model="filterOptions.promptId" @change="currentPage = 1; loadLogs()">
+                    <select id="promptFilter" x-model="filterOptions.promptUID" @change="currentPage = 1; loadLogs()">
                         <option value="">All Prompts</option>
-                        <template x-for="(prompt, promptId) in {{toJSON .Prompts}}" :key="promptId">
-                            <option :value="promptId" x-text="prompt.Name || promptId"></option>
+                        <template x-for="(prompt, promptUID) in {{toJSON .Prompts}}" :key="promptUID">
+                            <option :value="promptUID" x-text="prompt.Name || promptUID"></option>
                         </template>
                     </select>
                 </div>

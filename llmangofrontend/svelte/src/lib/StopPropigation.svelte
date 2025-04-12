@@ -1,0 +1,8 @@
+<script lang="ts">
+    let { children } = $props();
+
+</script>
+
+<div style="display:contents;" class="button-wrapper" onclick={(e)=>{e.stopPropagation()}}>
+{@render children()}
+</div>

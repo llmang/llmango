@@ -1,0 +1,171 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+```markdown
+## Svelte 5 Usage Guide (General)
+
+This guide outlines **Svelte 5–only** patterns, syntax, and best practices. It assumes full usage of **TypeScript** and modern Svelte 5 APIs. It is designed to be copy-pasted into any new Svelte 5 project for onboarding or reference.
+
+---
+
+### Svelte 5 + TypeScript Setup
+
+Use `<script lang="ts">` in **all** components and pages.
+
+```svelte
+<script lang="ts">
+    // Type-safe Svelte code here
+</script>
+```
+
+---
+
+### Reactive State: `$state`
+
+```ts
+let count = $state(0)
+```
+
+- Reactive primitive or object state
+- **DO NOT export raw $state**. Wrap it in a POJO if needed externally:
+```ts
+export const state = { count }
+```
+
+---
+
+### Derived Values: `$derived`
+
+```ts
+let next = $derived(count + 1)
+
+let complex = $derived.by(() => {
+    return count * 2
+})
+```
+
+- Automatically tracks dependencies
+- Use `.by()` for more control and readability
+
+---
+
+### Reactive Side Effects: `$effect`
+
+```ts
+$effect(() => {
+    console.log("Count changed:", count)
+})
+
+$effect(() => {
+    untrack(() => {
+        console.log("Multiple states accessed:", count, otherState)
+    })
+})
+```
+
+- Triggers whenever dependencies inside run
+- Use sparingly; prefer functions and event bindings
+
+---
+
+### Props Syntax in Svelte 5
+
+**Usage:**
+```svelte
+<MyComponent title="hello" isActive={true}/>
+```
+
+**Component:**
+```svelte
+<script lang="ts">
+    let { title, isActive, children } = $props()
+</script>
+
+<div>{title}</div>
+{@render children()}
+```
+
+- Use `$props()` to destructure props
+- Render `children()` using `{@render}`
+
+---
+
+### Event Handling
+
+```svelte
+<button onclick={handleClick}>Click</button>
+<button onclick={() => doThing(123)}>Click</button>
+<div onhover={(e) => handleHover(e)}>Hover</div>
+```
+
+- Use plain attributes: `onclick`, `onhover`, `onscroll`, etc.
+- No `on:` prefix in Svelte 5
+
+---
+
+### File & Component Styles
+
+- Use `<style>` block for local component styles
+- Use shared styles in `src/index.css` or imported global files
+- Only move styles to global CSS if **truly reused**
+
+---
+
+### Component & File Structure
+
+- Page-specific components live alongside the page
+- Reusable components go in `src/lib/`
+- Use `$lib/` alias for importing:
+```ts
+import MyComponent from '$lib/components/MyComponent.svelte'
+```
+
+---
+
+### Async Class Patterns (Optional Convention)
+
+For global data handlers or service classes:
+
+```ts
+export class MyService {
+    data: SomeType | null = null
+    private initialized = false
+
+    async initialize() {
+        if (this.initialized) return
+        this.data = await fetchData()
+        this.initialized = true
+    }
+}
+
+export const myService = new MyService()
+```
+
+**Usage:**
+```svelte
+<script lang="ts">
+    import { myService } from '$lib/classes/myService'
+    await myService.initialize()
+</script>
+
+<await myService.initialize() :then>
+    {myService.data?.something}
+</await>
+```
+
+---
+
+### Summary
+
+- Use `$state`, `$derived`, `$effect` only as needed
+- Use `<script lang="ts">` always
+- Use `onclick`/`onhover`, not `on:click`
+- Props handled via `$props()`
+- Component children rendered via `{@render children()}`
+- Reusable logic lives in `$lib`
+- Maintain clean structure: page-specific vs shared
+
+This reference is for **Svelte 5** only. Do not use syntax from older versions.
+```

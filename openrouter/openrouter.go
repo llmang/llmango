@@ -30,19 +30,9 @@ func CreateOpenRouter(apiKey string) (*OpenRouter, error) {
 	return nil, errors.New("failed to create openrouter as the api key was empty")
 }
 
-// OpenRouterLLMOptions holds optional parameters for OpenRouter requests.
-type OpenRouterLLMOptions struct {
-	TopP              float64 `json:"top_p,omitempty"`
-	Temperature       float64 `json:"temperature,omitempty"`
-	FrequencyPenalty  float64 `json:"frequency_penalty,omitempty"`
-	PresencePenalty   float64 `json:"presence_penalty,omitempty"`
-	RepetitionPenalty float64 `json:"repetition_penalty,omitempty"`
-	TopK              int     `json:"top_k,omitempty"`
-}
-
 type OpenRouterParameters struct {
-	TopP              float64 `json:"top_p,omitempty"`
 	Temperature       float64 `json:"temperature,omitempty"`
+	TopP              float64 `json:"top_p,omitempty"`
 	FrequencyPenalty  float64 `json:"frequency_penalty,omitempty"`
 	PresencePenalty   float64 `json:"presence_penalty,omitempty"`
 	RepetitionPenalty float64 `json:"repetition_penalty,omitempty"`

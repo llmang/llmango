@@ -5,6 +5,7 @@ import (
 	"log"
 	"maps"
 	"os"
+	"time"
 
 	"github.com/llmang/llmango/llmango"
 )
@@ -109,6 +110,9 @@ func WithJSONSaveState(fileName string, mango *llmango.LLMangoManager) (*llmango
 
 	loadConfig(mango, config.Goals)
 
+	// Update timestamp fields if they are empty
+	updateTimestamps(mango)
+
 	return mango, nil
 }
 
@@ -143,8 +147,44 @@ func loadConfig(m *llmango.LLMangoManager, fileGoalsInfo map[string]*llmango.Goa
 				maps.Copy(goal.Solutions, info.Solutions)
 			}
 		}
-		return nil
 	}
 
 	return nil
+}
+
+// updateTimestamps sets CreatedAt and UpdatedAt fields to current Unix time if they are empty (0)
+func updateTimestamps(m *llmango.LLMangoManager) {
+	currentTime := int(time.Now().Unix())
+
+	// Update timestamps for prompts
+	for _, prompt := range m.Prompts {
+		if prompt.CreatedAt == 0 {
+			prompt.CreatedAt = currentTime
+		}
+		if prompt.UpdatedAt == 0 {
+			prompt.UpdatedAt = currentTime
+		}
+	}
+
+	// Update timestamps for goals
+	for _, goalAny := range m.Goals {
+		if goal, ok := goalAny.(*llmango.Goal[any, any]); ok {
+			if goal.CreatedAt == 0 {
+				goal.CreatedAt = currentTime
+			}
+			if goal.UpdatedAt == 0 {
+				goal.UpdatedAt = currentTime
+			}
+
+			// Update timestamps for solutions
+			for _, solution := range goal.Solutions {
+				if solution.CreatedAt == 0 {
+					solution.CreatedAt = currentTime
+				}
+				if solution.UpdatedAt == 0 {
+					solution.UpdatedAt = currentTime
+				}
+			}
+		}
+	}
 }

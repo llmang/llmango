@@ -1,0 +1,97 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+# Project
+We are converting our alpinejs and templ project Llmango into svelte 
+
+It uses a golang backend
+
+## tech stack
+Svelte5, global .css files, local scoped svelte css, event handlers used
+
+Sveltekit Adaper Static -> SPA system for Sveltekit
+
+This project uses Svelte 5 which is a new updated versison which has some differnet rules
+
+### $state
+let var = $state(val)
+-Are reactive
+-to be safely exported/used externally they must be wrapped by a POJO either inisde or outisde the state 
+
+### $derived
+let var = $derived(val+1)
+let var2 = $derived.by(()=>return(val+1))
+
+we can use either derived or derived.by for derives. They automatically update based on the states
+
+### $effect
+
+$effect(()=>{
+    myState
+    console.log("My state changed)
+})
+
+$effect(()=>{
+    myState
+    untrack(()=>{
+        console.log("this state changed here is myState and my other state:", myState, myOtherState)
+    })
+})
+
+
+This automatically runs based on the state variables inside of it changing.
+Untrack can be used to store variables we don't want to trigger the effect.
+
+EFFECT SHOULD BE USED RARELY, using a function or an event listenr is usually better. 
+
+
+### props in svelte5
+
+<MyComponent prop1="val", prop2={false}/>
+
+
+<script>
+    let{prop1, prop2, children}=$props()
+</script>
+
+<div>
+    <div>{prop1}</div>
+    <div>{prop2}</div>
+    {@render children()}
+</div>
+
+This is the svelte 5 way to use props. We can also render the children of a compoennt this way too. WE NO THIS IS THE NEW WAY TO RENDER CHILDREN.
+
+### event handlers
+<button onclick={eventHandler}>clickme</button>
+<button onclick={()=>eventHandler()}>clickme</button>
+
+<div onhover{(e)=>eventHandler(e)}>hoverme</div>
+
+etc...
+
+The Svelete 5 event handlers are written like
+onhover, onclick, onscroll
+
+### $lib
+$lib is an alias for PROJECTROOT/src/lib
+This is where we store items we want to share easily across the app
+
+### internal design patterns
+We use classes to initialize and persist data across sessions. These classes are stored in $lib/classes/class.svelte.js
+
+we export individual class isntances from each class file export {myInstance}
+
+hese usually have initializer functions which are async functions which return a promise (we persist the promise after first initialization so we can always check if we are intiialized WITHOUT reinitializing)
+
+await myClassInstance.intialize()
+
+... now we use the class
+or 
+<await myClassInstance.intialize() :then>
+	{myClassInstance.expectedDataObject?.thing}
+</await>
+
+

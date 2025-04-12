@@ -33,9 +33,12 @@ func CreateLLMangoManger(o *openrouter.OpenRouter) (*LLMangoManager, error) {
 
 type Prompt struct {
 	UID        string                `json:"UID"`
+	GoalUID    string                `json:"goalUID"`
 	Model      string                `json:"model"`
 	Parameters openrouter.Parameters `json:"parameters"`
 	Messages   []openrouter.Message  `json:"messages"`
+	CreatedAt  int                   `json:"createdAt"`
+	UpdatedAt  int                   `json:"updatedAt"`
 }
 
 type Solution struct {
@@ -44,6 +47,8 @@ type Solution struct {
 	IsCanary  bool   `json:"isCanary"`
 	MaxRuns   int    `json:"maxRuns"`
 	TotalRuns int    `json:"totalRuns"`
+	CreatedAt int    `json:"createdAt"`
+	UpdatedAt int    `json:"updatedAt"`
 }
 
 type GoalInfo struct {
@@ -51,6 +56,8 @@ type GoalInfo struct {
 	Solutions   map[string]*Solution `json:"solutions"`
 	Title       string               `json:"title"`
 	Description string               `json:"description"`
+	CreatedAt   int                  `json:"createdAt"`
+	UpdatedAt   int                  `json:"updatedAt"`
 }
 
 // Do we want to add the ability to

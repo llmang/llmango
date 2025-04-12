@@ -440,8 +440,8 @@ templ SolutionForm(mode string, prompts map[string]*llmango.Prompt, baseRoute st
 
 			document.querySelectorAll('.edit-search-item').forEach(item => {
 				item.addEventListener('click', function() {
-					const promptId = this.getAttribute('data-id');
-					document.getElementById('edit-solution-prompt-uid').value = promptId;
+					const promptUID = this.getAttribute('data-id');
+					document.getElementById('edit-solution-prompt-uid').value = promptUID;
 					document.getElementById('edit-prompt-search-dropdown').style.display = 'none';
 					document.getElementById('edit-search-toggle').textContent = 'Search';
 				});
@@ -463,8 +463,8 @@ templ SolutionForm(mode string, prompts map[string]*llmango.Prompt, baseRoute st
 
 			document.querySelectorAll('.new-search-item').forEach(item => {
 				item.addEventListener('click', function() {
-					const promptId = this.getAttribute('data-id');
-					document.getElementById('new-solution-prompt-uid').value = promptId;
+					const promptUID = this.getAttribute('data-id');
+					document.getElementById('new-solution-prompt-uid').value = promptUID;
 					document.getElementById('new-prompt-search-dropdown').style.display = 'none';
 					document.getElementById('new-search-toggle').textContent = 'Search';
 				});
@@ -574,7 +574,7 @@ templ NewPromptModal(baseRoute string, openVar string) {
 					.then(data => {
 						if (data.success) {
 							// Set the new prompt as selected in solution form
-							document.getElementById('new-solution-prompt-uid').value = data.data.promptId;
+							document.getElementById('new-solution-prompt-uid').value = data.data.promptUID;
 							Alpine.store("new-prompt", false);
 							Alpine.store("new-solution", true);
 						} else {

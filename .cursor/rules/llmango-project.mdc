@@ -5,7 +5,7 @@ alwaysApply: true
 ---
 # tech stack
 Go 1.24+ (golang)
-templ Templates, alpine.js,
+templ Templates, alpine.js, -> we are converting to svelte5 and sveltekit adapter static
 
 ## notable packages
 net/http 1.22+ router UPDATED version

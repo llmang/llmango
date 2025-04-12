@@ -114,7 +114,7 @@ templ LogLoader(baseRoute string) {
             isLoading: false,
             filterOptions: {
                 goalId: null,
-                promptId: null,
+                promptUID: null,
                 perPage: 10
             },
             async loadLogs() {
@@ -131,8 +131,8 @@ templ LogLoader(baseRoute string) {
                     if (this.filterOptions.goalId) {
                         params.append('goalId', this.filterOptions.goalId);
                     }
-                    if (this.filterOptions.promptId) {
-                        params.append('promptId', this.filterOptions.promptId);
+                    if (this.filterOptions.promptUID) {
+                        params.append('promptUID', this.filterOptions.promptUID);
                     }
                     
                     const response = await fetch(url + '?' + params.toString());
@@ -188,7 +188,7 @@ templ LogPage(baseRoute string, initialGoals map[string]any, initialPrompts map[
             isLoading: false,
             filterOptions: {
                 goalId: null,
-                promptId: null,
+                promptUID: null,
                 perPage: 10
             },
             goals: {},
@@ -219,8 +219,8 @@ templ LogPage(baseRoute string, initialGoals map[string]any, initialPrompts map[
                     if (this.filterOptions.goalId) {
                         params.append('goalId', this.filterOptions.goalId);
                     }
-                    if (this.filterOptions.promptId) {
-                        params.append('promptId', this.filterOptions.promptId);
+                    if (this.filterOptions.promptUID) {
+                        params.append('promptUID', this.filterOptions.promptUID);
                     }
                     
                     const response = await fetch(url + '?' + params.toString());
@@ -249,7 +249,7 @@ templ LogPage(baseRoute string, initialGoals map[string]any, initialPrompts map[
             resetFilters() {
                 this.filterOptions = {
                     goalId: null,
-                    promptId: null,
+                    promptUID: null,
                     perPage: 10
                 };
                 this.currentPage = 1;
@@ -273,7 +273,7 @@ templ LogPage(baseRoute string, initialGoals map[string]any, initialPrompts map[
                 
                 <div class="filter-group">
                     <label for="promptFilter">Prompt:</label>
-                    <select id="promptFilter" x-model="filterOptions.promptId" @change="currentPage = 1; loadLogs()">
+                    <select id="promptFilter" x-model="filterOptions.promptUID" @change="currentPage = 1; loadLogs()">
                         <option value="">All Prompts</option>
                         <template x-for="(prompt, id) in prompts" :key="id">
                             <option :value="id" x-text="prompt.Name || id"></option>

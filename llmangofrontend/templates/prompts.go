@@ -404,7 +404,7 @@ const PromptsTemplates = `
         </details>
 
         <h3>Recent Logs</h3>
-        {{template "log-viewer" dict "BaseRoute" .BaseRoute "FilterOptions" (dict "promptId" .Prompt.UID)}}
+        {{template "log-viewer" dict "BaseRoute" .BaseRoute "FilterOptions" (dict "promptUID" .Prompt.UID)}}
     </div>
 
     <!-- Edit Prompt Modal -->
@@ -621,7 +621,7 @@ const PromptsTemplates = `
         max-height: 200px;
         overflow: auto;
         white-space: pre-wrap;
-        margin-bottom: 1.5rem;
+        margin-bottom: 1rem;
         position: relative;
         
         /* Custom syntax highlighting */
@@ -652,7 +652,7 @@ const PromptsTemplates = `
         border: 1px solid #ffeeba;
         border-radius: 0.5rem;
         padding: 1.5rem;
-        margin-bottom: 1.5rem;
+        margin-bottom: 1rem;
     }
 
     .warning-icon {
@@ -677,7 +677,7 @@ const PromptsTemplates = `
     }
 
     .form-group {
-        margin-bottom: 1.5rem;
+        margin-bottom: 1rem;
     }
 
     .form-control {

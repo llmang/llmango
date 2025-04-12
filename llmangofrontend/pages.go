@@ -47,9 +47,9 @@ func (r *Router) handleModelsPage(w http.ResponseWriter, req *http.Request) {
 func (r *Router) handleLogsPage(w http.ResponseWriter, req *http.Request) {
 	// Initialize default filter options
 	filterOptions := map[string]interface{}{
-		"goalId":   nil,
-		"promptId": nil,
-		"perPage":  10,
+		"goalId":    nil,
+		"promptUID": nil,
+		"perPage":   10,
 	}
 
 	data := LogsPageData{

@@ -362,7 +362,7 @@ const GoalsTemplates = `
                                     .then(data => {
                                         if (data.success) {
                                             // Set the new prompt as selected in solution form
-                                            newSolution.promptUid = data.data.promptId;
+                                            newSolution.promptUid = data.data.promptUID;
                                             // Go back to solution form
                                             showNewPromptModal = false;
                                             showNewSolutionModal = true;
