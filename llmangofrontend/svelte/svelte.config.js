@@ -14,6 +14,9 @@ const config = {
 		},
 		paths: {
 			base: '/mango'
+		},
+		version: {
+			name: Date.now().toString()
 		}
 	}
 };

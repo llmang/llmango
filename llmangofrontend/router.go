@@ -10,7 +10,7 @@ import (
 	"github.com/llmang/llmango/llmango"
 )
 
-//go:embed svelte/build/**
+//go:embed all:svelte/build/**
 var embeddedSvelteBuild embed.FS
 
 type Router struct {
