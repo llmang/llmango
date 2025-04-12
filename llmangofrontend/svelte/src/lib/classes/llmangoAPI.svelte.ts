@@ -223,10 +223,18 @@ class LLMangoAPI {
     }
 
     updateSolution = async (solutionUID: string, solution: Solution, goalUID: string): Promise<void> => {
+        // Convert to format expected by the backend API
         await this.fetch(`/solutions/${solutionUID}/update`, {
             method: 'POST',
-            body: JSON.stringify({ goalUID, solution })
+            body: JSON.stringify({
+                goalUID,
+                promptUID: solution.promptUID,
+                weight: solution.weight,
+                isCanary: solution.isCanary,
+                maxRuns: solution.maxRuns
+            })
         });
+        
         // Update the solution in the specified goal's solutions
         if (this.goals[goalUID]) {
             if (!this.goals[goalUID].solutions) {

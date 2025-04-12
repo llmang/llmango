@@ -3,7 +3,6 @@
     import { onMount } from 'svelte';
 
     let searchQuery = $state('');
-    let expandedModel = $state<string | null>(null);
 
     onMount(async () => {
         await openrouter.initialize();
@@ -68,64 +67,58 @@
     {:else}
         <div class="models-grid">
             {#each filteredModels() as model (model.id)}
-                <div 
-                    class="model-card" 
-                    class:expanded={expandedModel === model.id}
-                    onclick={() => expandedModel = expandedModel === model.id ? null : model.id}
-                >
-                    <div class="model-header">
-                        <h3>{model.name}</h3>
-                        <div>
-                            <small>{new Date(model.created * 1000).toLocaleDateString()}</small>
+                <details class="model-card">
+                    <summary>
+                        <div class="model-header">
+                            <h3>{model.name}</h3>
+                            <div class="model-date">{new Date(model.created * 1000).toLocaleDateString()}</div>
                         </div>
-                    </div>
+                        <div class="details-indicator">
+                            <span class="details-text">details</span>
+                            <span class="expand-icon">▼</span>
+                        </div>
+                    </summary>
                     
-                    {#if expandedModel === model.id}
-                        <div class="model-details">
-                            <hr />
-                            
-                            <div class="model-info">
-                                <div>
-                                    <strong>ID:</strong> <code>{model.id}</code>
-                                </div>
-                                <div>
-                                    <strong>Context Length:</strong> {model.context_length?.toLocaleString()}
-                                </div>
-                                {#if model.pricing}
-                                    <div>
-                                        <strong>Pricing:</strong> 
-                                        <div class="pricing-details">
-                                            <div>Prompt: ${model.pricing.prompt?.toFixed(7)} / token</div>
-                                            <div>Completion: ${model.pricing.completion?.toFixed(7)} / token</div>
-                                        </div>
-                                    </div>
-                                {/if}
+                    <div class="model-details">
+                        <hr />
+                        
+                        <div class="model-info">
+                            <div>
+                                <strong>ID:</strong> <code>{model.id}</code>
                             </div>
-                            
-                            <div class="model-description">
-                                {model.description || 'No description available'}
+                            <div>
+                                <strong>Context Length:</strong> {model.context_length?.toLocaleString()}
                             </div>
-                            
-                            {#if model.architecture}
-                                <div class="model-architecture">
-                                    <strong>Modalities:</strong>
-                                    <div>
-                                        <strong>Input:</strong> 
-                                        {model.architecture.input_modalities?.join(', ') || 'text'}
-                                    </div>
-                                    <div>
-                                        <strong>Output:</strong> 
-                                        {model.architecture.output_modalities?.join(', ') || 'text'}
+                            {#if model.pricing}
+                                <div>
+                                    <strong>Pricing:</strong> 
+                                    <div class="pricing-details">
+                                        <div>Prompt: ${typeof model.pricing.prompt === 'number' ? model.pricing.prompt.toFixed(7) : 'N/A'} / token</div>
+                                        <div>Completion: ${typeof model.pricing.completion === 'number' ? model.pricing.completion.toFixed(7) : 'N/A'} / token</div>
                                     </div>
                                 </div>
                             {/if}
                         </div>
-                    {/if}
-                    
-                    <div class="expand-indicator">
-                        {expandedModel === model.id ? '▲ Collapse' : '▼ Details'}
+                        
+                        <div class="model-description">
+                            {model.description || 'No description available'}
+                        </div>
+                        
+                        {#if model.architecture}
+                            <div class="model-architecture">
+                                <strong>Modalities:</strong>
+                                <div>
+                                    <strong>Input:</strong> 
+                                    {model.architecture.input_modalities?.join(', ') || 'text'}
+                                </div>
+                                <div>
+                                    <strong>Output:</strong> 
+                                    {model.architecture.output_modalities?.join(', ') || 'text'}
+                                </div>
+                            </div>
+                        {/if}
                     </div>
-                </div>
+                </details>
             {/each}
         </div>
     {/if}
@@ -199,24 +192,63 @@
         border: 1px solid #eee;
         border-radius: 8px;
         padding: 15px;
-        cursor: pointer;
         transition: all 0.2s ease;
+        position: relative;
     }
 
     .model-card:hover {
         box-shadow: 0 2px 8px rgba(0,0,0,0.1);
     }
 
+    summary {
+        list-style: none;
+        cursor: pointer;
+        width: 100%;
+    }
+
+    summary::-webkit-details-marker {
+        display: none;
+    }
+
     .model-header {
         display: flex;
         justify-content: space-between;
-        align-items: center;
+        align-items: start;
+        margin-bottom: .5rem;
+        gap:.5rem;
     }
 
     .model-header h3 {
         margin: 0;
         font-size: 1.1rem;
     }
+    .model-date{
+        font-size: .8rem;
+        font-weight: 300;
+        color:grey;
+    }
+
+    .details-indicator {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap:.5rem;
+        color: #aaa;
+    }
+    
+    .details-text {
+        font-size: 0.7rem;
+    }
+
+    .expand-icon {
+        font-size: 0.8rem;
+        transition: transform 0.2s ease;
+    }
+
+    details[open] .expand-icon {
+        transform: rotate(180deg);
+    }
+
 
     .model-details {
         margin-top: 10px;
@@ -243,13 +275,6 @@
 
     .model-architecture {
         margin-top: 10px;
-    }
-
-    .expand-indicator {
-        text-align: center;
-        margin-top: 10px;
-        color: #666;
-        font-size: 0.9rem;
     }
 
     hr {

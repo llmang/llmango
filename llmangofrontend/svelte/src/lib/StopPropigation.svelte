@@ -3,6 +3,6 @@
 
 </script>
 
-<div style="display:contents;" class="button-wrapper" onclick={(e)=>{e.stopPropagation()}}>
+<div style="display:contents;" class="button-wrapper" onclick={(e)=>{e.stopPropagation(); e.preventDefault()}}>
 {@render children()}
 </div>

@@ -9,6 +9,8 @@
     import PromptCard from '$lib/PromptCard.svelte';
     import { llmangoLogging, type Log } from '$lib/classes/llmangoLogging.svelte';
     import LogTable from '$lib/LogTable.svelte';
+    import { base } from '$app/paths';
+    import StopPropagation from '$lib/StopPropigation.svelte';
 
     let goaluid = $derived(page.params.goaluid);
 
@@ -74,15 +76,26 @@
         currentSolution = null;
     };
 
-    // Format timestamp to readable date
-    function formatDate(timestamp: number): string {
-        return new Date(timestamp).toLocaleString();
-    }
-
     let newSolutionModalOpen = $state(false);
     let editSolutionModalOpen = $state(false);
     let currentSolutionId = $state('');
     let currentSolution = $state<Solution | null>(null);
+
+    // Added helper function to compute solution status badge
+    function getSolutionStatus(solution: Solution): { label: string, dotColor: string, bgColor: string } {
+        if (solution.weight === 0) {
+            return { label: "Stopped", dotColor: "#6c757d", bgColor: "#e9ecef" };
+        }
+        if (solution.isCanary) {
+            if (solution.totalRuns >= solution.maxRuns) {
+                return { label: "Completed", dotColor: "#007bff", bgColor: "#cce5ff" };
+            } else {
+                return { label: "In Progress", dotColor: "#fd7e14", bgColor: "#ffe5d1" };
+            }
+        } else {
+            return { label: "Running", dotColor: "#28a745", bgColor: "#d4edda" };
+        }
+    }
 </script>
 
 <div class="goal-page">
@@ -120,12 +133,38 @@
                 {#if goal.solutions && Object.keys(goal.solutions).length > 0}
                     {#each Object.entries(goal.solutions) as [solutionId, solutionObj]}
                         {@const solution = solutionObj as Solution}
+                        {@const status = getSolutionStatus(solution)}
                         <Card 
                             title={solution.promptUID || 'No Prompt'}
-                            description={`Weight: ${solution.weight}${solution.isCanary ? ` | Runs: ${solution.totalRuns}/${solution.maxRuns}` : ''}`}
-                            onclick={() => openEditSolutionModal(solutionId, solution)}
-                            >
-                            <div class="status-indicator"></div>
+                            description={""}
+                            href={solution.promptUID ? `${base}/prompt/${solution.promptUID}` : undefined}
+                        >
+                            <div class="solution-badge" style="background-color: {status.bgColor};">
+                                <span class="badge-label">{status.label}</span>
+                                <span class="badge-dot" style="background-color: {status.dotColor};"></span>
+                            </div>
+                            <div class="solution-meta">
+                                <span>Prompt UID: {solution.promptUID || 'None'}</span>
+                                <span>Weight: {solution.weight}</span>
+                                {#if solution.isCanary}
+                                    <span>Runs: {solution.totalRuns}/{solution.maxRuns}</span>
+                                    <span>Type: Canary</span>
+                                {:else}
+                                    <span>Type: Standard</span>
+                                {/if}
+                            </div>
+                            
+                            <div class="edit-button-container">
+                                <StopPropagation>
+                                    <button 
+                                        class="btn-edit" 
+                                        onclick={() => openEditSolutionModal(solutionId, solution)}
+                                        title="Edit Solution"
+                                    >
+                                        Edit
+                                    </button>
+                                </StopPropagation>
+                            </div>
                         </Card>
                     {/each}
                 {/if}
@@ -206,19 +245,7 @@
         box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
     }
     
-    
 
-
-    .status-indicator {
-        position: absolute; 
-        top: 10px; 
-        right: 10px; 
-        width: 12px; 
-        height: 12px; 
-        border-radius: 50%;
-        background-color: #28a745;
-    }
-    
     .goal-debug {
         border-top: 1px solid #eee;
         padding-top: 0.5rem;
@@ -272,5 +299,61 @@
     
     .prompt-indicator {
         background-color: #007bff;
+    }
+
+    .solution-badge {
+        position: absolute;
+        top: 10px;
+        right: 10px;
+        display: flex;
+        align-items: center;
+        padding: 2px 6px;
+        border-radius: 12px;
+        font-size: 0.75rem;
+        color: #333;
+    }
+    .badge-label {
+        margin-right: 4px;
+    }
+    .badge-dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+    }
+    .solution-meta {
+        margin-top: 0.5rem;
+        font-size: 0.85rem;
+        color: #666;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 1rem;
+    }
+    .solution-meta span {
+        background-color: #f9f9f9;
+        padding: 0.2rem 0.5rem;
+        border-radius: 4px;
+    }
+    
+    /* Edit button styles */
+    .edit-button-container {
+        position: absolute;
+        bottom: 10px;
+        right: 10px;
+    }
+    
+    .btn-edit {
+        background-color: #f8f9fa;
+        border: 1px solid #ced4da;
+        color: #495057;
+        padding: 4px 10px;
+        border-radius: 4px;
+        font-size: 0.8rem;
+        cursor: pointer;
+        transition: all 0.2s ease;
+    }
+    
+    .btn-edit:hover {
+        background-color: #e9ecef;
+        border-color: #adb5bd;
     }
 </style> 

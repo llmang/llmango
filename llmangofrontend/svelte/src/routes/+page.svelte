@@ -4,11 +4,15 @@
     import { llmangoAPI, type Prompt, type Goal, type Solution } from '$lib/classes/llmangoAPI.svelte';
     import PromptCard from '$lib/PromptCard.svelte';
     import GoalCard from '$lib/GoalCard.svelte';
+    import { llmangoLogging, type Log } from '$lib/classes/llmangoLogging.svelte';
+    import LogTable from '$lib/LogTable.svelte';
 
     let recentPrompts = $state<Record<string, Prompt>>({});
     let recentGoals = $state<Record<string, Goal>>({});
     let loading = $state(true);
     let error = $state<string | null>(null);
+    let recentLogs = $state<Log[]>([]);
+    let logsLoading = $state(false);
 
     // Helper function to check if a goal uses a specific prompt
     function goalUsesPrompt(goal: Goal, promptUID: string): boolean {
@@ -27,22 +31,44 @@
         try {
             recentPrompts = await llmangoAPI.getAllPrompts();
             recentGoals = await llmangoAPI.getAllGoals();
-            loading = false;
         } catch (e) {
             error = e instanceof Error ? e.message : 'Failed to load data';
+        }
+        try {
+            logsLoading = true;
+            const logsResponse = await llmangoLogging.getAllLogs({ includeRaw: true, limit: 5, offset: 0 });
+            recentLogs = logsResponse?.logs ?? [];
+        } catch (logError) {
+            console.error('Failed to load recent logs:', logError);
+            recentLogs = [];
+        } finally {
+            logsLoading = false;
             loading = false;
         }
     });
 </script>
 
 <div class="home-page">
-    <h1>LLMango Dashboard</h1>
+    <div class="page-header"><h1>LLMango Dashboard</h1></div>
 
     {#if loading}
         <p>Loading...</p>
     {:else if error}
         <p class="error">{error}</p>
     {:else}
+        <div class="section">
+            <div class="section-header">
+                <h2>Recent Logs</h2>
+                <a href={`${base}/logs`}>View All</a>
+            </div>
+            {#if logsLoading}
+                <p>Loading logs...</p>
+            {:else if recentLogs.length > 0}
+                <LogTable logs={recentLogs} cells={5} />
+            {:else}
+                <p>No logs available</p>
+            {/if}
+        </div>
         <div class="section">
             <div class="section-header">
                 <h2>Recent Goals</h2>
@@ -60,7 +86,6 @@
                 {/if}
             </div>
         </div>
-
         <div class="section">
             <div class="section-header">
                 <h2>Recent Prompts</h2>
@@ -77,7 +102,6 @@
                 {/if}
             </div>
         </div>
-
         <hr />
 
         <div class="section">
@@ -102,8 +126,9 @@
 </div>
 
 <style>
-    h1 {
-        margin-bottom: 2rem;
+
+    h2{
+        margin:0;
     }
 
     .section {
