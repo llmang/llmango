@@ -2,8 +2,6 @@ package llmangofrontend
 
 import (
 	"embed"
-	"io/fs"
-	"log"
 	"net/http"
 
 	"github.com/carsongh/go-sveltespa"
@@ -30,17 +28,6 @@ func CreateLLMMangRouter(l *llmango.LLMangoManager, baseRoute *string) http.Hand
 	// Register API routes
 	apiRouter := router.CreateAPIRouter()
 	mux.Handle("/api/", http.StripPrefix("/api", apiRouter))
-
-	// List all files in the embedded filesystem
-	fs.WalkDir(embeddedSvelteBuild, ".", func(path string, d fs.DirEntry, err error) error {
-		if err != nil {
-			return err
-		}
-		if !d.IsDir() {
-			log.Println("Embedded file:", path)
-		}
-		return nil
-	})
 
 	svelteRouter := sveltespa.EmbeddedRouter(embeddedSvelteBuild, "svelte/build", "index.html")
 	mux.HandleFunc("/", svelteRouter)
