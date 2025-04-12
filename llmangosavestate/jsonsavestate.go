@@ -2,6 +2,7 @@ package llmangosavestate
 
 import (
 	"encoding/json"
+	"fmt"
 	"log"
 	"maps"
 	"os"
@@ -110,8 +111,16 @@ func WithJSONSaveState(fileName string, mango *llmango.LLMangoManager) (*llmango
 
 	loadConfig(mango, config.Goals)
 
-	// Update timestamp fields if they are empty
-	updateTimestamps(mango)
+	
+	// updateTimestamps(mango)
+
+	// Save the state to persist the timestamp updates
+	err = mango.SaveState()
+	if err != nil {
+		log.Printf("ERROR: MANGO: Failed to save state after updating timestamps: %v", err)
+	} else {
+		log.Printf("INFO: MANGO: Successfully saved state after updating timestamps")
+	}
 
 	return mango, nil
 }
@@ -155,36 +164,55 @@ func loadConfig(m *llmango.LLMangoManager, fileGoalsInfo map[string]*llmango.Goa
 // updateTimestamps sets CreatedAt and UpdatedAt fields to current Unix time if they are empty (0)
 func updateTimestamps(m *llmango.LLMangoManager) {
 	currentTime := int(time.Now().Unix())
+	log.Printf("INFO: MANGO: Setting timestamps to %d for empty values", currentTime)
 
-	// Update timestamps for prompts
-	for _, prompt := range m.Prompts {
-		if prompt.CreatedAt == 0 {
-			prompt.CreatedAt = currentTime
+	// Update timestamps for prompts using map keys
+	for key := range m.Prompts {
+		prompt := m.Prompts[key]
+		log.Printf("INFO: MANGO: Prompt %s has CreatedAt=%d, UpdatedAt=%d", key, prompt.CreatedAt, prompt.UpdatedAt)
+		if m.Prompts[key].CreatedAt == 0 {
+			m.Prompts[key].CreatedAt = currentTime
+			log.Printf("INFO: MANGO: Updated CreatedAt for prompt %s", key)
 		}
-		if prompt.UpdatedAt == 0 {
-			prompt.UpdatedAt = currentTime
+		if m.Prompts[key].UpdatedAt == 0 {
+			m.Prompts[key].UpdatedAt = currentTime
+			log.Printf("INFO: MANGO: Updated UpdatedAt for prompt %s", key)
 		}
 	}
 
-	// Update timestamps for goals
-	for _, goalAny := range m.Goals {
-		if goal, ok := goalAny.(*llmango.Goal[any, any]); ok {
+	// Update timestamps for goals using type assertion
+	for key := range m.Goals {
+		log.Printf("INFO: MANGO: Processing goal %s", key)
+		if goal, ok := m.Goals[key].(*llmango.Goal[any, any]); ok {
+			log.Printf("INFO: MANGO: Goal %s has CreatedAt=%d, UpdatedAt=%d", key, goal.CreatedAt, goal.UpdatedAt)
 			if goal.CreatedAt == 0 {
 				goal.CreatedAt = currentTime
+				log.Printf("INFO: MANGO: Updated CreatedAt for goal %s", key)
 			}
 			if goal.UpdatedAt == 0 {
 				goal.UpdatedAt = currentTime
+				log.Printf("INFO: MANGO: Updated UpdatedAt for goal %s", key)
 			}
 
-			// Update timestamps for solutions
-			for _, solution := range goal.Solutions {
-				if solution.CreatedAt == 0 {
-					solution.CreatedAt = currentTime
+			// Update timestamps for solutions using map keys
+			for solKey := range goal.Solutions {
+				solution := goal.Solutions[solKey]
+				log.Printf("INFO: MANGO: Solution %s in goal %s has CreatedAt=%d, UpdatedAt=%d",
+					solKey, key, solution.CreatedAt, solution.UpdatedAt)
+				if goal.Solutions[solKey].CreatedAt == 0 {
+					goal.Solutions[solKey].CreatedAt = currentTime
+					log.Printf("INFO: MANGO: Updated CreatedAt for solution %s in goal %s", solKey, key)
 				}
-				if solution.UpdatedAt == 0 {
-					solution.UpdatedAt = currentTime
+				if goal.Solutions[solKey].UpdatedAt == 0 {
+					goal.Solutions[solKey].UpdatedAt = currentTime
+					log.Printf("INFO: MANGO: Updated UpdatedAt for solution %s in goal %s", solKey, key)
 				}
 			}
+		} else {
+			log.Printf("ERROR: MANGO: Could not type assert goal %s as *llmango.Goal[any, any]", key)
+			// Try to find the actual type for debugging
+			goalType := fmt.Sprintf("%T", m.Goals[key])
+			log.Printf("INFO: MANGO: Goal %s has actual type %s", key, goalType)
 		}
 	}
 }

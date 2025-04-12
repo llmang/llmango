@@ -72,8 +72,8 @@ func (r *APIRouter) handleGetPrompt(w http.ResponseWriter, req *http.Request) {
 
 // handleGetPromptLogs handles log queries for a specific prompt
 func (r *APIRouter) handleGetPromptLogs(w http.ResponseWriter, req *http.Request) {
-	promptID := req.PathValue("promptuid")
-	if promptID == "" {
+	promptUID := req.PathValue("promptuid")
+	if promptUID == "" {
 		w.WriteHeader(http.StatusBadRequest)
 		json.NewEncoder(w).Encode("Missing prompt ID")
 		return
@@ -101,7 +101,7 @@ func (r *APIRouter) handleGetPromptLogs(w http.ResponseWriter, req *http.Request
 	}
 
 	filter := &llmango.LLmangoLogFilter{
-		PromptUID: &promptID,
+		PromptUID: &promptUID,
 		Limit:     perPage,
 		Offset:    (page - 1) * perPage,
 	}
@@ -144,8 +144,8 @@ func (r *APIRouter) handleDeletePrompt(w http.ResponseWriter, req *http.Request)
 		return
 	}
 
-	promptID := deleteReq.PromptUID
-	if promptID == "" {
+	promptUID := deleteReq.PromptUID
+	if promptUID == "" {
 		BadRequest(w, "Prompt ID is required")
 		return
 	}
@@ -156,14 +156,14 @@ func (r *APIRouter) handleDeletePrompt(w http.ResponseWriter, req *http.Request)
 	}
 
 	// Check if prompt exists
-	if _, exists := r.LLMangoManager.Prompts[promptID]; !exists {
+	if _, exists := r.LLMangoManager.Prompts[promptUID]; !exists {
 		w.WriteHeader(http.StatusNotFound)
 		w.Write([]byte("Prompt not found"))
 		return
 	}
 
 	// Delete the prompt
-	delete(r.LLMangoManager.Prompts, promptID)
+	delete(r.LLMangoManager.Prompts, promptUID)
 
 	// Save state if SaveState function is set
 	if r.LLMangoManager.SaveState != nil {
@@ -192,14 +192,14 @@ func (r *APIRouter) handleCreatePrompt(w http.ResponseWriter, req *http.Request)
 	}
 
 	// Create prompt ID
-	promptID := generateUID()
+	promptUID := generateUID()
 	if createReq.UID != "" {
-		promptID = createReq.UID
+		promptUID = createReq.UID
 	}
 
 	// Create prompt
 	prompt := &llmango.Prompt{
-		UID:        promptID,
+		UID:        promptUID,
 		Model:      createReq.Model,
 		Parameters: openrouter.Parameters{},
 		Messages:   []openrouter.Message{},
@@ -236,7 +236,7 @@ func (r *APIRouter) handleCreatePrompt(w http.ResponseWriter, req *http.Request)
 	}
 
 	// Add prompt to the map
-	r.Prompts[promptID] = prompt
+	r.Prompts[promptUID] = prompt
 
 	// Save state after creating the prompt
 	if r.SaveState != nil {
@@ -247,20 +247,20 @@ func (r *APIRouter) handleCreatePrompt(w http.ResponseWriter, req *http.Request)
 	}
 
 	json.NewEncoder(w).Encode(map[string]string{
-		"promptUID": promptID,
+		"promptUID": promptUID,
 	})
 }
 
 // handleUpdatePrompt updates an existing prompt
 func (r *APIRouter) handleUpdatePrompt(w http.ResponseWriter, req *http.Request) {
 	// Extract prompt ID from URL pattern
-	promptID := req.PathValue("promptuid")
-	if promptID == "" {
+	promptUID := req.PathValue("promptuid")
+	if promptUID == "" {
 		BadRequest(w, "Missing prompt ID")
 		return
 	}
 
-	prompt, exists := r.Prompts[promptID]
+	prompt, exists := r.Prompts[promptUID]
 	if !exists {
 		w.WriteHeader(http.StatusNotFound)
 		w.Write([]byte("Prompt not found"))
@@ -323,5 +323,7 @@ func (r *APIRouter) handleUpdatePrompt(w http.ResponseWriter, req *http.Request)
 		}
 	}
 
-	w.Write([]byte("Prompt updated successfully"))
+	// Return the updated prompt as JSON response
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(prompt)
 }

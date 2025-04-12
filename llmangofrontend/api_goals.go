@@ -12,13 +12,13 @@ import (
 // handleUpdateGoal updates a goal's title and description
 func (r *APIRouter) handleUpdateGoal(w http.ResponseWriter, req *http.Request) {
 	// Extract goal ID from URL pattern
-	goalID := req.PathValue("goaluid")
-	if goalID == "" {
+	goalUID := req.PathValue("goaluid")
+	if goalUID == "" {
 		BadRequest(w, "Missing goal ID")
 		return
 	}
 
-	goalAny, exists := r.Goals[goalID]
+	goalAny, exists := r.Goals[goalUID]
 	if !exists {
 		w.WriteHeader(http.StatusNotFound)
 		w.Write([]byte("Goal not found"))
@@ -51,7 +51,9 @@ func (r *APIRouter) handleUpdateGoal(w http.ResponseWriter, req *http.Request) {
 			}
 		}
 
-		w.Write([]byte("Goal updated successfully"))
+		// Return the updated goal as JSON response
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(goalAny)
 	} else {
 		ServerError(w, fmt.Errorf("goal type assertion failed"))
 	}

@@ -10,11 +10,11 @@ import (
 
 // LogFilter represents the filter parameters for log queries
 type LogFilter struct {
-	GoalID   string `json:"goalId,omitempty"`
-	PromptID string `json:"promptUID,omitempty"`
-	Level    string `json:"level,omitempty"`
-	Page     int    `json:"page"`
-	PerPage  int    `json:"perPage"`
+	goalUID   string `json:"goalUID,omitempty"`
+	PromptUID string `json:"promptUID,omitempty"`
+	Level     string `json:"level,omitempty"`
+	Page      int    `json:"page"`
+	PerPage   int    `json:"perPage"`
 }
 
 // PaginationResponse represents pagination information for API responses
@@ -100,8 +100,8 @@ func (r *APIRouter) handleGetLogs(w http.ResponseWriter, req *http.Request) {
 // handleGetGoalLogs handles log queries for a specific goal
 func (r *APIRouter) handleGetGoalLogs(w http.ResponseWriter, req *http.Request) {
 
-	goalID := req.PathValue("goaluid")
-	if goalID == "" {
+	goalUID := req.PathValue("goaluid")
+	if goalUID == "" {
 		w.WriteHeader(http.StatusBadRequest)
 		json.NewEncoder(w).Encode("Missing goal ID")
 		return
@@ -129,7 +129,7 @@ func (r *APIRouter) handleGetGoalLogs(w http.ResponseWriter, req *http.Request) 
 	}
 
 	filter := &llmango.LLmangoLogFilter{
-		GoalUID: &goalID,
+		GoalUID: &goalUID,
 		Limit:   perPage,
 		Offset:  (page - 1) * perPage,
 	}

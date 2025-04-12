@@ -3,6 +3,7 @@ package llmangofrontend
 import (
 	"encoding/json"
 	"fmt"
+	"log"
 	"net/http"
 	"reflect"
 
@@ -13,26 +14,29 @@ import (
 func (r *APIRouter) handleCreateSolution(w http.ResponseWriter, req *http.Request) {
 	// Parse request body
 	var createReq struct {
-		GoalID    string `json:"goalId"`
-		PromptUID string `json:"promptUid"`
+		GoalUID   string `json:"goalUID"`
+		PromptUID string `json:"promptUID"`
 		Weight    int    `json:"weight"`
 		IsCanary  bool   `json:"isCanary"`
 		MaxRuns   int    `json:"maxRuns"`
 	}
+	log.Println("1.1.1")
 
 	if err := json.NewDecoder(req.Body).Decode(&createReq); err != nil {
 		w.WriteHeader(http.StatusBadRequest)
 		json.NewEncoder(w).Encode("Invalid request body")
 		return
 	}
+	log.Println("1.1.2")
 
 	// Validate request
-	goalAny, exists := r.Goals[createReq.GoalID]
+	goalAny, exists := r.Goals[createReq.GoalUID]
 	if !exists {
 		w.WriteHeader(http.StatusNotFound)
 		json.NewEncoder(w).Encode("Goal not found")
 		return
 	}
+	log.Println("1.1.3")
 
 	if createReq.PromptUID != "" {
 		if _, exists := r.Prompts[createReq.PromptUID]; !exists {
@@ -41,6 +45,7 @@ func (r *APIRouter) handleCreateSolution(w http.ResponseWriter, req *http.Reques
 			return
 		}
 	}
+	log.Println("1.1.4")
 
 	// Create the solution
 	solutionID := generateUID()
@@ -51,10 +56,11 @@ func (r *APIRouter) handleCreateSolution(w http.ResponseWriter, req *http.Reques
 		MaxRuns:   createReq.MaxRuns,
 		TotalRuns: 0,
 	}
+	log.Println("1.1.5")
 
 	// Use reflection to access and modify the Solutions map in the goal
 	v := reflect.ValueOf(goalAny)
-	if v.Kind() == reflect.Ptr {
+	for v.Kind() == reflect.Ptr {
 		v = v.Elem()
 	}
 
@@ -73,6 +79,10 @@ func (r *APIRouter) handleCreateSolution(w http.ResponseWriter, req *http.Reques
 		return
 	}
 
+	// If the map is nil, initialize it
+	if solutionsMap.IsNil() {
+		solutionsMap.Set(reflect.MakeMap(solutionsMap.Type()))
+	}
 	// Set the solution in the map
 	solutionsMap.SetMapIndex(reflect.ValueOf(solutionID), reflect.ValueOf(solution))
 
@@ -101,8 +111,8 @@ func (r *APIRouter) handleUpdateSolution(w http.ResponseWriter, req *http.Reques
 
 	// Parse request body
 	var updateReq struct {
-		GoalID    string `json:"goalId"`
-		PromptUID string `json:"promptUid"`
+		GoalUID   string `json:"goalUID"`
+		PromptUID string `json:"promptUID"`
 		Weight    int    `json:"weight"`
 		IsCanary  bool   `json:"isCanary"`
 		MaxRuns   int    `json:"maxRuns"`
@@ -114,7 +124,7 @@ func (r *APIRouter) handleUpdateSolution(w http.ResponseWriter, req *http.Reques
 	}
 
 	// Validate goal exists
-	goalAny, exists := r.Goals[updateReq.GoalID]
+	goalAny, exists := r.Goals[updateReq.GoalUID]
 	if !exists {
 		w.WriteHeader(http.StatusNotFound)
 		w.Write([]byte("Goal not found"))
@@ -123,7 +133,7 @@ func (r *APIRouter) handleUpdateSolution(w http.ResponseWriter, req *http.Reques
 
 	// Use reflection to access the Solutions map
 	v := reflect.ValueOf(goalAny)
-	if v.Kind() == reflect.Ptr {
+	for v.Kind() == reflect.Ptr {
 		v = v.Elem()
 	}
 
@@ -166,7 +176,9 @@ func (r *APIRouter) handleUpdateSolution(w http.ResponseWriter, req *http.Reques
 		}
 	}
 
-	w.Write([]byte("Solution updated successfully"))
+	// Return the updated solution as JSON response
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(solution)
 }
 
 // handleDeleteSolution deletes a solution
@@ -180,7 +192,7 @@ func (r *APIRouter) handleDeleteSolution(w http.ResponseWriter, req *http.Reques
 
 	// Parse request body to get the goal ID
 	var deleteReq struct {
-		GoalID string `json:"goalId"`
+		GoalUID string `json:"goalUID"`
 	}
 
 	if err := json.NewDecoder(req.Body).Decode(&deleteReq); err != nil {
@@ -189,7 +201,7 @@ func (r *APIRouter) handleDeleteSolution(w http.ResponseWriter, req *http.Reques
 	}
 
 	// Validate goal exists
-	goalAny, exists := r.Goals[deleteReq.GoalID]
+	goalAny, exists := r.Goals[deleteReq.GoalUID]
 	if !exists {
 		w.WriteHeader(http.StatusNotFound)
 		w.Write([]byte("Goal not found"))
@@ -198,7 +210,7 @@ func (r *APIRouter) handleDeleteSolution(w http.ResponseWriter, req *http.Reques
 
 	// Use reflection to access the Solutions map
 	v := reflect.ValueOf(goalAny)
-	if v.Kind() == reflect.Ptr {
+	for v.Kind() == reflect.Ptr {
 		v = v.Elem()
 	}
 

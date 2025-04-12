@@ -214,33 +214,36 @@ class LLMangoAPI {
             body: JSON.stringify({ goalUID, solution })
         });
         if (this.goals[goalUID]) {
+            if (!this.goals[goalUID].solutions) {
+                this.goals[goalUID].solutions = {};
+            }
             this.goals[goalUID].solutions[solution.promptUID] = solution;
         }
     }
 
-    updateSolution = async (solutionUID: string, solution: Solution): Promise<void> => {
+    updateSolution = async (solutionUID: string, solution: Solution, goalUID: string): Promise<void> => {
         await this.fetch(`/solutions/${solutionUID}/update`, {
             method: 'POST',
-            body: JSON.stringify(solution)
+            body: JSON.stringify({ goalUID, solution })
         });
-        // Find and update the solution in the relevant goal
-        for (const goal of Object.values(this.goals)) {
-            if (goal.solutions[solutionUID]) {
-                goal.solutions[solutionUID] = solution;
-                break;
+        // Update the solution in the specified goal's solutions
+        if (this.goals[goalUID]) {
+            if (!this.goals[goalUID].solutions) {
+                this.goals[goalUID].solutions = {};
             }
+            this.goals[goalUID].solutions[solutionUID] = solution;
         }
     }
 
-    deleteSolution = async (solutionUID: string): Promise<void> => {
+    deleteSolution = async (solutionUID: string, goalUID: string): Promise<void> => {
         await this.fetch(`/solutions/${solutionUID}/delete`, {
-            method: 'POST'
+            method: 'POST',
+            body: JSON.stringify({ goalUID })
         });
-        // Find and delete the solution from the relevant goal
-        for (const goal of Object.values(this.goals)) {
-            if (goal.solutions[solutionUID]) {
-                delete goal.solutions[solutionUID];
-                break;
+        // Delete solution from the specified goal
+        if (this.goals[goalUID]) {
+            if (this.goals[goalUID].solutions) {
+                delete this.goals[goalUID].solutions[solutionUID];
             }
         }
     }

@@ -76,7 +76,7 @@
             if (mode === 'create') {
                 await llmangoAPI.createSolution(goalUID, solution);
             } else if (mode === 'edit' && currentSolutionId) {
-                await llmangoAPI.updateSolution(currentSolutionId, solution);
+                await llmangoAPI.updateSolution(currentSolutionId, solution, goalUID);
             }
             
             onClose();
@@ -101,7 +101,7 @@
         error = null;
         
         try {
-            await llmangoAPI.deleteSolution(currentSolutionId);
+            await llmangoAPI.deleteSolution(currentSolutionId, goalUID);
             onClose();
             // Reload the page to show changes
             window.location.reload();
