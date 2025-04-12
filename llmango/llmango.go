@@ -42,6 +42,7 @@ type Prompt struct {
 }
 
 type Solution struct {
+	// SolutionUID string `json:"solutionUID"` we ned to impelmnet this
 	PromptUID string `json:"promptUID"`
 	Weight    int    `json:"weight"`
 	IsCanary  bool   `json:"isCanary"`

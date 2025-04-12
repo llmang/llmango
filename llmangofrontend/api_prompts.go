@@ -172,8 +172,10 @@ func (r *APIRouter) handleDeletePrompt(w http.ResponseWriter, req *http.Request)
 			return
 		}
 	}
-
-	w.Write([]byte("Prompt deleted successfully"))
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]string{
+		"message": "Prompt deleted successfully",
+	})
 }
 
 // handleCreatePrompt creates a new prompt

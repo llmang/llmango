@@ -11,6 +11,7 @@
     import Card from '$lib/Card.svelte';
     import { llmangoLogging, type Log } from '$lib/classes/llmangoLogging.svelte';
     import LogTable from '$lib/LogTable.svelte';
+    import { goto } from '$app/navigation';
 
     let promptuid = $derived(page.params.promptuid);
 
@@ -100,7 +101,7 @@
         try {
             await llmangoAPI.deletePrompt(promptuid);
             // Redirect to prompts list
-            window.location.href = '/prompts';
+            goto(base+"/prompts")
         } catch (e) {
             error = e instanceof Error ? e.message : 'Failed to delete prompt';
         }

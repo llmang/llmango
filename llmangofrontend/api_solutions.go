@@ -14,20 +14,21 @@ import (
 func (r *APIRouter) handleCreateSolution(w http.ResponseWriter, req *http.Request) {
 	// Parse request body
 	var createReq struct {
-		GoalUID   string `json:"goalUID"`
-		PromptUID string `json:"promptUID"`
-		Weight    int    `json:"weight"`
-		IsCanary  bool   `json:"isCanary"`
-		MaxRuns   int    `json:"maxRuns"`
+		GoalUID  string `json:"goalUID"`
+		Solution struct {
+			PromptUID string `json:"promptUID"`
+			Weight    int    `json:"weight"`
+			IsCanary  bool   `json:"isCanary"`
+			MaxRuns   int    `json:"maxRuns"`
+		} `json:"solution"`
 	}
-	log.Println("1.1.1")
 
 	if err := json.NewDecoder(req.Body).Decode(&createReq); err != nil {
 		w.WriteHeader(http.StatusBadRequest)
 		json.NewEncoder(w).Encode("Invalid request body")
 		return
 	}
-	log.Println("1.1.2")
+	log.Printf("1.1.1 %v", createReq)
 
 	// Validate request
 	goalAny, exists := r.Goals[createReq.GoalUID]
@@ -36,27 +37,24 @@ func (r *APIRouter) handleCreateSolution(w http.ResponseWriter, req *http.Reques
 		json.NewEncoder(w).Encode("Goal not found")
 		return
 	}
-	log.Println("1.1.3")
 
-	if createReq.PromptUID != "" {
-		if _, exists := r.Prompts[createReq.PromptUID]; !exists {
+	if createReq.Solution.PromptUID != "" {
+		if _, exists := r.Prompts[createReq.Solution.PromptUID]; !exists {
 			w.WriteHeader(http.StatusBadRequest)
 			json.NewEncoder(w).Encode("Prompt not found")
 			return
 		}
 	}
-	log.Println("1.1.4")
 
 	// Create the solution
 	solutionID := generateUID()
 	solution := &llmango.Solution{
-		PromptUID: createReq.PromptUID,
-		Weight:    createReq.Weight,
-		IsCanary:  createReq.IsCanary,
-		MaxRuns:   createReq.MaxRuns,
+		PromptUID: createReq.Solution.PromptUID,
+		Weight:    createReq.Solution.Weight,
+		IsCanary:  createReq.Solution.IsCanary,
+		MaxRuns:   createReq.Solution.MaxRuns,
 		TotalRuns: 0,
 	}
-	log.Println("1.1.5")
 
 	// Use reflection to access and modify the Solutions map in the goal
 	v := reflect.ValueOf(goalAny)
@@ -246,5 +244,8 @@ func (r *APIRouter) handleDeleteSolution(w http.ResponseWriter, req *http.Reques
 		}
 	}
 
-	w.Write([]byte("Solution deleted successfully"))
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]string{
+		"message": "Solution deleted successfully",
+	})
 }

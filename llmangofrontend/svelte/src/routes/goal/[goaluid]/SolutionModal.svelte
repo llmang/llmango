@@ -2,6 +2,7 @@
     import { llmangoAPI } from '$lib/classes/llmangoAPI.svelte';
     import type { Prompt, Solution } from '$lib/classes/llmangoAPI.svelte';
     import Modal from '$lib/Modal.svelte';
+    import { onMount } from 'svelte';
     
     let { isOpen, mode, goalUID, prompts, currentSolution, currentSolutionId, onClose } = $props<{
         isOpen: boolean;
@@ -23,7 +24,7 @@
     let error = $state<string | null>(null);
     
     // Initialize form when editing
-    $effect(() => {
+    onMount(() => {
         if (mode === 'edit' && currentSolution) {
             selectedPromptUID = currentSolution.promptUID;
             weight = currentSolution.weight;
@@ -80,8 +81,6 @@
             }
             
             onClose();
-            // Reload the page to show changes
-            window.location.reload();
         } catch (err) {
             error = err instanceof Error ? err.message : 'An unknown error occurred';
             console.error('Error saving solution:', err);
@@ -103,8 +102,6 @@
         try {
             await llmangoAPI.deleteSolution(currentSolutionId, goalUID);
             onClose();
-            // Reload the page to show changes
-            window.location.reload();
         } catch (err) {
             error = err instanceof Error ? err.message : 'An unknown error occurred';
             console.error('Error deleting solution:', err);

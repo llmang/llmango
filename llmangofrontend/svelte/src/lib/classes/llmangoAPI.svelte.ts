@@ -35,7 +35,7 @@ export class PromptParameters {
     presence_penalty?: number;
     
     constructor(params: Partial<PromptParameters> = {}) {
-        this.temperature = params.temperature !== undefined ? params.temperature : 0.7;
+        this.temperature = params.temperature;
         this.max_tokens = params.max_tokens;
         this.top_p = params.top_p;
         this.frequency_penalty = params.frequency_penalty;
@@ -209,6 +209,7 @@ class LLMangoAPI {
 
     // Solutions API
     createSolution = async (goalUID: string, solution: Solution): Promise<void> => {
+        console.log("created solution", solution)
         await this.fetch('/solution/create', {
             method: 'POST',
             body: JSON.stringify({ goalUID, solution })

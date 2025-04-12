@@ -335,7 +335,7 @@
                  
         {#if !goalUID}
         <div class="variables-info">
-            <span>Available variable: <code>{"{{.Input}}"}</code> - The goal's input data</span>
+            <span>Variables are written through: <code>{"{{variableName}}"}</code> - These are the go struct json tag names</span>
         </div>
         {/if}
         <div class="form-group messages-section">
