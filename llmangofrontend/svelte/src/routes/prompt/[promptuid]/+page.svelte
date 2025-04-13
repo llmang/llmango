@@ -1,26 +1,28 @@
-<script lang="ts">
+    <script lang="ts">
     import FormatJson from '$lib/FormatJson.svelte';
     import type { Prompt, Goal } from '$lib/classes/llmangoAPI.svelte';
     import { llmangoAPI } from '$lib/classes/llmangoAPI.svelte';
     import { onMount } from 'svelte';
     import { page } from '$app/state';
     import Modal from '$lib/Modal.svelte';
-    import CreatePromptModal from '$lib/CreatePromptModal.svelte';
     import PromptMessageFormatter from '$lib/PromptMessageFormatter.svelte';
     import { base } from '$app/paths';
     import Card from '$lib/Card.svelte';
     import { llmangoLogging, type Log } from '$lib/classes/llmangoLogging.svelte';
     import LogTable from '$lib/LogTable.svelte';
     import { goto } from '$app/navigation';
+    import PromptModal from '$lib/PromptModal.svelte';
 
-    let promptuid = $derived(page.params.promptuid);
+
+
+
+    let promptuid: string = $derived(page.params.promptuid);
+    let prompt: Prompt | null = $derived(llmangoAPI.prompts[promptuid] || null);
+    let goal: Goal | null = $derived(llmangoAPI.goals[prompt?.goalUID] || null);
 
     // Initial states - initialize with safe defaults
-    let prompt = $state<Prompt | null>(null);
-    let goal = $state<Goal | null>(null);
-    let goalLoadError = $state<boolean>(false);
-    let loading = $state(true);
     let error = $state<string | null>(null);
+    let loading = $state(true);
     let logs = $state<Log[]>([]);  // Initialize as empty array
     let logsLoading = $state(false);
     
@@ -30,49 +32,23 @@
     
     // Load data on component mount
     onMount(async () => {
+        loading = true;
         try {
-            const fetchedPrompt = await llmangoAPI.getPrompt(promptuid);
-            
-            if (!fetchedPrompt) {
-                error = `Prompt with ID ${promptuid} not found`;
-            } else {
-                prompt = fetchedPrompt;
-                
-                // Fetch associated goal if goalUID exists
-                if (prompt.goalUID) {
-                    try {
-                        const fetchedGoal = await llmangoAPI.getGoal(prompt.goalUID);
-                        if (fetchedGoal) {
-                            goal = fetchedGoal;
-                        } else {
-                            goalLoadError = true;
-                        }
-                    } catch (error) {
-                        console.error('Failed to fetch goal:', error);
-                        goalLoadError = true;
-                    }
-                }
-                
-                // Fetch logs for this prompt
-                logsLoading = true;
-                try {
-                    const logsResponse = await llmangoLogging.getPromptLogs(promptuid, {
-                        includeRaw: true,
-                        limit: 5,
-                        offset: 0
-                    });
-                    logs = logsResponse?.logs || [];  // Use nullish coalescing to ensure we always have an array
-                } catch (logError) {
-                    console.error('Failed to load logs:', logError);
-                    logs = []; // Ensure logs is at least an empty array on error
-                } finally {
-                    logsLoading = false;
-                }
-            }
+            await llmangoAPI.initialize()
+            prompt?.goalUID
+            logsLoading = true;
+            const logsResponse = await llmangoLogging.getPromptLogs(promptuid, {
+                includeRaw: true,
+                limit: 5,
+                offset: 0
+            });
+            logs = logsResponse?.logs || [];  // Use nullish coalescing to ensure we always have an array
         } catch (e) {
             error = e instanceof Error ? e.message : 'Failed to load data';
         } finally {
             loading = false;
+            logsLoading = false;
+            
         }
     });
     
@@ -87,10 +63,6 @@
         editModalOpen = true;
     }
     
-    // Handle prompt update from the modal
-    function handleSavePrompt(updatedPrompt: Prompt) {
-        prompt = updatedPrompt;
-    }
     
     // Delete the prompt
     async function deletePrompt() {
@@ -106,14 +78,10 @@
             error = e instanceof Error ? e.message : 'Failed to delete prompt';
         }
     }
-    
-    // Format timestamp to readable date
-    function formatDate(timestamp: number): string {
-        return new Date(timestamp).toLocaleString();
-    }
-</script>
 
+</script>
 <div class="prompt-page">
+    <div>Prompt page</div>
     {#if loading}
         <div class="loading">Loading prompt data...</div>
     {:else if error}
@@ -169,12 +137,7 @@
             <!-- Goal Section -->
             {#if prompt.goalUID}
                 <h3>Associated Goal</h3>
-                {#if goalLoadError}
-                    <div class="goal-error">
-                        <span class="warning-icon">⚠️</span> 
-                        Attached Goal could not be found. It may be broken or removed.
-                    </div>
-                {:else if goal}
+                {#if goal}
                     <Card 
                         title={goal.UID} 
                         description={goal.description || 'No description'} 
@@ -261,14 +224,14 @@
         </Modal>
         
         <!-- Edit Prompt Modal -->
-        <CreatePromptModal
+        <PromptModal
+            goalUID={prompt.goalUID} 
+            {prompt}
             isOpen={editModalOpen}
-            mode="edit"
-            prompt={prompt}
-            promptUID={promptuid}
             onClose={() => editModalOpen = false}
-            onSave={handleSavePrompt}
         />
+    {:else}
+    <div>No prompt  but loaded</div>
     {/if}
 </div>
 

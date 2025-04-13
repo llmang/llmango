@@ -1,93 +1,60 @@
+<svelte:head>
+    <title>{goal?.title || 'Goal Details'} - LLMango</title>
+</svelte:head>
+
 <script lang="ts">
     import FormatJson from '$lib/FormatJson.svelte';
-    import Card from '$lib/Card.svelte';
-    import type { Goal, Prompt, Solution } from '$lib/classes/llmangoAPI.svelte';
+    import type { Goal, Prompt } from '$lib/classes/llmangoAPI.svelte';
     import { llmangoAPI } from '$lib/classes/llmangoAPI.svelte';
-    import SolutionModal from './SolutionModal.svelte';
     import { onMount } from 'svelte';
     import { page } from '$app/state';
-    import PromptCard from '$lib/PromptCard.svelte';
     import { llmangoLogging, type Log } from '$lib/classes/llmangoLogging.svelte';
     import LogTable from '$lib/LogTable.svelte';
+    import PromptModal from '$lib/PromptModal.svelte';
     import { base } from '$app/paths';
-    import StopPropagation from '$lib/StopPropigation.svelte';
+    import PromptCard from '$lib/PromptCard.svelte';
 
     let goaluid = $derived(page.params.goaluid);
 
     // Initial states with safe defaults
-    let goal = $state<Goal | null>(null);
-    let prompts = $state<Record<string, Prompt>>({});
+    let goal = $derived(llmangoAPI?.goals?.[goaluid])
+    let prompts = $derived(llmangoAPI?.promptsByGoalUID?.[goaluid] || null)
     let loading = $state(true);
     let error = $state<string | null>(null);
     let logs = $state<Log[]>([]);  // Initialize as empty array
     let logsLoading = $state(false);
     
+    // Modal state
+    let promptModalOpen = $state(false);
+    let modalPrompt = $state<Prompt | null>(null);
+    let isViewMode = $state(false);
+    
     // Load data on component mount
     onMount(async () => {
+        loading = true;
         try {
-            // Fetch goal and prompts data in parallel
-            const [fetchedGoal, fetchedPrompts] = await Promise.all([
-                llmangoAPI.getGoal(goaluid),
-                llmangoAPI.getAllPrompts()
-            ]);
-            
-            if (!fetchedGoal) {
-                error = `Goal with ID ${goaluid} not found`;
-            } else {
-                goal = fetchedGoal;
-                prompts = fetchedPrompts || {};
-                
-                // Fetch logs for this goal
-                logsLoading = true;
-                try {
-                    const logsResponse = await llmangoLogging.getGoalLogs(goaluid, {
-                        includeRaw: true,
-                        limit: 5,
-                        offset: 0
-                    });
-                    logs = logsResponse?.logs || [];  // Use nullish coalescing to ensure we always have an array
-                } catch (logError) {
-                    console.error('Failed to load logs:', logError);
-                    logs = []; // Ensure logs is at least an empty array on error
-                } finally {
-                    logsLoading = false;
-                }
-            }
+            await llmangoAPI.initialize()
+            logsLoading = true;
+            const logsResponse = await llmangoLogging.getGoalLogs(goaluid, {
+                includeRaw: true,
+                limit: 5,
+                offset: 0
+            });
+            logs = logsResponse?.logs 
         } catch (e) {
             error = e instanceof Error ? e.message : 'Failed to load data';
-        } finally {
+        }finally{
             loading = false;
         }
     });
 
-    const openEditSolutionModal = (solutionId: string, solution: Solution) => {
-        currentSolutionId = solutionId;
-        currentSolution = solution;
-        editSolutionModalOpen = true;
-    };
-
-    const closeNewSolutionModal = () => {
-        newSolutionModalOpen = false;
-    };
-
-    const closeEditSolutionModal = () => {
-        editSolutionModalOpen = false;
-        currentSolutionId = '';
-        currentSolution = null;
-    };
-
-    let newSolutionModalOpen = $state(false);
-    let editSolutionModalOpen = $state(false);
-    let currentSolutionId = $state('');
-    let currentSolution = $state<Solution | null>(null);
-
     // Added helper function to compute solution status badge
-    function getSolutionStatus(solution: Solution): { label: string, dotColor: string, bgColor: string } {
-        if (solution.weight === 0) {
+    function getPromptStatus(prompt: Prompt): { label: string, dotColor: string, bgColor: string } {
+        if (prompt.weight === 0) {
             return { label: "Stopped", dotColor: "#6c757d", bgColor: "#e9ecef" };
         }
-        if (solution.isCanary) {
-            if (solution.totalRuns >= solution.maxRuns) {
+        if (prompt.isCanary) {
+            if (prompt.totalRuns >= prompt.maxRuns) {
                 return { label: "Completed", dotColor: "#007bff", bgColor: "#cce5ff" };
             } else {
                 return { label: "In Progress", dotColor: "#fd7e14", bgColor: "#ffe5d1" };
@@ -96,156 +63,200 @@
             return { label: "Running", dotColor: "#28a745", bgColor: "#d4edda" };
         }
     }
+
+    // Open modal to create a new prompt
+    function openCreatePromptModal() {
+        modalPrompt = null;
+        isViewMode = false;
+        promptModalOpen = true;
+    }
+
+    // Open modal to view an existing prompt (read-only)
+    function openViewPromptModal(prompt: Prompt) {
+        modalPrompt = prompt;
+        isViewMode = true;
+        promptModalOpen = true;
+    }
 </script>
 
 <div class="goal-page">
     {#if loading}
         <div class="loading">Loading goal data...</div>
     {:else if error}
-        <div class="error">{error}</div>
-    {:else if goal}
-        <div class="goal-header">
-            <h2>Goal: <span class="goal-uid">{goaluid}</span></h2>
+        <div class="error">
+            <h2>Error</h2>
+            <p>{error}</p>
+            <a href="{base}/goal">Back to Goals</a>
+        </div>
+    {:else}
+        <div class="page-header">
+            <h1>{goal.title}</h1>
+            <p class="description">{goal.description}</p>
         </div>
 
-        <div class="card goal-card">
-            <div class="item-title">Title</div>
-            <div class="item">{goal.title || 'Untitled Goal'}</div>
-            <div class="item-title">Description</div>
-            <div class="item">{goal.description || 'No description'}</div>
-            <div class="input-output">
-                <div class="ioside">
-                    <div class="item-title">Input</div>
-                    <FormatJson jsonText={JSON.stringify(goal.exampleInput || "")} />
-                </div>
-                <div class="ioside">
-                    <div class="item-title">Output</div>
-                    <FormatJson jsonText={JSON.stringify(goal.exampleOutput || "")} />
-                </div>
+        <div class="meta-info">
+            <div class="meta-item">
+                <strong>Goal ID:</strong> {goal.UID}
             </div>
+            <div class="meta-item">
+                <strong>Prompts:</strong> {prompts.length}
+            </div>
+        </div>
 
-            <div class="item-title">Solutions <span style="font-size:.8em">({goal.solutions ? Object.keys(goal.solutions).length : 0})</span></div>
+        <h2>Example</h2>
+        <div class="examples">
+            <div class="example-panel">
+                <div class="item-title">Input</div>
+                <pre>{JSON.stringify(goal.exampleInput, null, 2)}</pre>
+            </div>
+            <div class="example-panel">
+                <div class="item-title">Output</div>
+                <pre>{JSON.stringify(goal.exampleOutput, null, 2)}</pre>
+            </div>
+        </div>
+
+        <h2>Prompts</h2>
+        {#if !prompts || prompts.length === 0}
+            <div class="empty-state">
+                <p>No prompts found for this goal.</p>
+                <button class="btn btn-primary" onclick={openCreatePromptModal}>Create First Prompt</button>
+            </div>
+        {:else}
             <div class="card-container">
-                <button class="button-wrapper card new-item-card" onclick={() => newSolutionModalOpen = true}>
+                <button onclick={()=>promptModalOpen=true} class="card new-item-card">
                     <div>+</div>
-                    <div>Add New Solution</div>
+                    <div>Create New Prompt</div>
                 </button>
-                {#if goal.solutions && Object.keys(goal.solutions).length > 0}
-                    {#each Object.entries(goal.solutions) as [solutionId, solutionObj]}
-                        {@const solution = solutionObj as Solution}
-                        {@const status = getSolutionStatus(solution)}
-                        <Card 
-                            title={solution.promptUID || 'No Prompt'}
-                            description={""}
-                            href={solution.promptUID ? `${base}/prompt/${solution.promptUID}` : undefined}
-                        >
-                            <div class="solution-badge" style="background-color: {status.bgColor};">
+                {#each prompts as prompt}
+                    <div class="prompt-card-wrapper">
+                        {#if true}
+                            {@const status = getPromptStatus(prompt)}
+                            <div class="status-badge" style="background-color: {status.bgColor}">
+                                <span class="badge-dot" style="background-color: {status.dotColor}"></span>
                                 <span class="badge-label">{status.label}</span>
-                                <span class="badge-dot" style="background-color: {status.dotColor};"></span>
                             </div>
-                            <div class="solution-meta">
-                                <span>Prompt UID: {solution.promptUID || 'None'}</span>
-                                <span>Weight: {solution.weight}</span>
-                                {#if solution.isCanary}
-                                    <span>Runs: {solution.totalRuns}/{solution.maxRuns}</span>
-                                    <span>Type: Canary</span>
-                                {:else}
-                                    <span>Type: Standard</span>
-                                {/if}
-                            </div>
-                            
-                            <div class="edit-button-container">
-                                <StopPropagation>
-                                    <button 
-                                        class="btn-edit" 
-                                        onclick={() => openEditSolutionModal(solutionId, solution)}
-                                        title="Edit Solution"
-                                    >
-                                        Edit
-                                    </button>
-                                </StopPropagation>
-                            </div>
-                        </Card>
-                    {/each}
-                {/if}
+                        {/if}
+                        <PromptCard {prompt}/>
+                        <button class="edit-button" onclick={() => openViewPromptModal(prompt)}>Edit</button>
+                    </div>
+                {/each}
             </div>
-            
-            <!-- Related Prompts Section -->
-            <div class="item-title">Related Prompts</div>
-            <div class="card-container">
-                {#if Object.keys(prompts).length > 0}
-                    {@const matchingPrompts = Object.entries(prompts).filter(([_, prompt]) => prompt?.goalUID === goaluid)}
-                    {#if matchingPrompts.length > 0}
-                        {#each matchingPrompts as [promptUID, prompt]}
-                            <PromptCard {prompt}/>
-                        {/each}
-                    {:else}
-                        <div class="no-items">No related prompts found</div>
-                    {/if}
-                {:else}
-                    <div class="no-items">No prompts loaded</div>
-                {/if}
-            </div>
-            
-            <!-- Logs Section -->
-            <div class="item-title">Recent Logs</div>
-            {#if logsLoading}
-                <div class="loading">Loading logs...</div>
-            {:else if logs && logs.length > 0}
-                <LogTable logs={logs || []} />
-            {:else}
-                <div class="no-items">No logs found for this goal</div>
-            {/if}
-            
-            <!-- Debug Info -->
-            <details class="goal-debug">
-                <summary>Debug Info</summary>
-                <FormatJson jsonText={JSON.stringify(goal)} />
-            </details>
-        </div>
-
-        <!-- Solution Modals -->
-        <SolutionModal 
-            isOpen={newSolutionModalOpen}
-            mode="create"
-            prompts={prompts}
-            currentSolution={null}
-            currentSolutionId=""
-            goalUID={goaluid}
-            onClose={closeNewSolutionModal}
-        />
-
-        <SolutionModal 
-            goalUID={goaluid}
-            isOpen={editSolutionModalOpen}
-            mode="edit"
-            prompts={prompts}
-            currentSolution={currentSolution}
-            currentSolutionId={currentSolutionId}
-            onClose={closeEditSolutionModal}
-        />
+        {/if}
+        
+        <!-- Logs Section -->
+        <div class="item-title">Recent Logs</div>
+        {#if logsLoading}
+            <div class="loading">Loading logs...</div>
+        {:else if logs && logs.length > 0}
+            <LogTable logs={logs || []} />
+        {:else}
+            <div class="no-items">No logs found for this goal</div>
+        {/if}
+        
+        <!-- Debug Info -->
+        <details class="goal-debug">
+            <summary>Debug Info</summary>
+            <FormatJson jsonText={JSON.stringify(goal)} />
+        </details>
     {/if}
+<!--     
+    {:else}
+        <div class="error">
+            <h2>Goal Not Found</h2>
+            <p>The requested goal could not be found.</p>
+            <a href="{base}/goal">Back to Goals</a>
+        </div>
+    {/if} -->
 </div>
 
+<!-- Prompt Modal -->
+{#if goal}
+    <PromptModal 
+        isOpen={promptModalOpen}
+        goalUID={goaluid}
+        prompt={modalPrompt}
+        onClose={() => promptModalOpen = false}
+    />
+{/if}
+
 <style>
-
+    .prompt-card-wrapper{
+        position:relative;
+        height: fit-content;
+        width: fit-content;
+    }
+    .edit-button{
+        position: absolute;
+        top:.5rem;
+        right:.5rem;
+        background-color: #e9ecef;
+        border: 1px solid #ced4da;
+        color: #495057;
+        border-radius: 4px;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        padding:.25em 1em;
+        font-weight: 600;
+        font-size: 1rem;
+    }
     .goal-page {
-        margin: 1rem 0;
+        max-width: 1200px;
+        margin: 0 auto;
+        padding: 1rem;
     }
     
-    .goal-header {
-        margin-bottom: 1rem;
-    }
-
-    .goal-card {
-        padding: 1.5rem;
-        margin-bottom: 2rem;
-        background: white;
+    .loading, .error {
+        text-align: center;
+        padding: 2rem;
+        background-color: #f8f9fa;
         border-radius: 8px;
-        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        margin: 2rem 0;
     }
     
+    .error {
+        color: #721c24;
+        background-color: #f8d7da;
+    }
 
+    .description {
+        color: #6c757d;
+        margin: 0;
+    }
+
+    
+    .meta-info {
+        display: flex;
+        gap: 2rem;
+        margin-bottom: 2rem;
+        color: #6c757d;
+    }
+    
+    .examples {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 1rem;
+        margin-bottom: 2rem;
+    }
+    
+    
+    pre {
+        background-color: #f1f3f5;
+        padding: 1rem;
+        border-radius: 4px;
+        overflow: auto;
+        white-space: pre-wrap;
+        word-break: break-word;
+    }
+    
+    .empty-state {
+        background-color: #f8f9fa;
+        border-radius: 8px;
+        padding: 2rem;
+        text-align: center;
+        margin: 2rem 0;
+    }
+    
+    
     .goal-debug {
         border-top: 1px solid #eee;
         padding-top: 0.5rem;
@@ -257,39 +268,6 @@
         font-size: 0.8rem;
     }
 
-
-    .loading,
-    .error {
-        padding: 2rem;
-        text-align: center;
-        background-color: #f9f9f9;
-        border-radius: 8px;
-    }
-    
-    .error {
-        color: #dc3545;
-        background-color: #f8d7da;
-    }
-
-    .goal-uid {
-        color: #777;
-        font-weight: normal;
-    }
-    
-
-    .input-output {
-        flex-wrap: wrap;
-        display: flex;
-        gap: 1rem;
-        margin-top: 1rem;
-        margin-bottom: 1rem;
-    }
-    
-    .ioside {
-        flex:1;
-    }
- 
-
     .no-items {
         padding: 1rem;
         text-align: center;
@@ -297,21 +275,6 @@
         font-style: italic;
     }
     
-    .prompt-indicator {
-        background-color: #007bff;
-    }
-
-    .solution-badge {
-        position: absolute;
-        top: 10px;
-        right: 10px;
-        display: flex;
-        align-items: center;
-        padding: 2px 6px;
-        border-radius: 12px;
-        font-size: 0.75rem;
-        color: #333;
-    }
     .badge-label {
         margin-right: 4px;
     }
@@ -320,40 +283,27 @@
         height: 8px;
         border-radius: 50%;
     }
-    .solution-meta {
-        margin-top: 0.5rem;
-        font-size: 0.85rem;
-        color: #666;
-        display: flex;
-        flex-wrap: wrap;
-        gap: 1rem;
-    }
-    .solution-meta span {
-        background-color: #f9f9f9;
-        padding: 0.2rem 0.5rem;
-        border-radius: 4px;
-    }
     
-    /* Edit button styles */
-    .edit-button-container {
+    /* Status badge styles */
+    .status-badge {
         position: absolute;
-        bottom: 10px;
+        top: 10px;
         right: 10px;
+        display: flex;
+        align-items: center;
+        padding: 2px 8px;
+        border-radius: 12px;
+        font-size: 0.75rem;
+        color: #333;
     }
     
-    .btn-edit {
-        background-color: #f8f9fa;
-        border: 1px solid #ced4da;
-        color: #495057;
-        padding: 4px 10px;
-        border-radius: 4px;
-        font-size: 0.8rem;
-        cursor: pointer;
-        transition: all 0.2s ease;
+    .badge-label {
+        margin-left: 4px;
     }
     
-    .btn-edit:hover {
-        background-color: #e9ecef;
-        border-color: #adb5bd;
+    .badge-dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
     }
 </style> 

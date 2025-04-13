@@ -23,7 +23,6 @@ type LLMangoManager struct {
 
 func CreateLLMangoManger(o *openrouter.OpenRouter) (*LLMangoManager, error) {
 	// defaultFileName := "llmango.json"
-
 	return &LLMangoManager{
 		OpenRouter: o,
 		Prompts:    make(map[string]*Prompt),
@@ -37,28 +36,22 @@ type Prompt struct {
 	Model      string                `json:"model"`
 	Parameters openrouter.Parameters `json:"parameters"`
 	Messages   []openrouter.Message  `json:"messages"`
-	CreatedAt  int                   `json:"createdAt"`
-	UpdatedAt  int                   `json:"updatedAt"`
-}
 
-type Solution struct {
-	// SolutionUID string `json:"solutionUID"` we ned to impelmnet this
-	PromptUID string `json:"promptUID"`
-	Weight    int    `json:"weight"`
-	IsCanary  bool   `json:"isCanary"`
-	MaxRuns   int    `json:"maxRuns"`
-	TotalRuns int    `json:"totalRuns"`
-	CreatedAt int    `json:"createdAt"`
-	UpdatedAt int    `json:"updatedAt"`
+	CreatedAt int `json:"createdAt"`
+	UpdatedAt int `json:"updatedAt"`
+
+	Weight    int  `json:"weight"`
+	IsCanary  bool `json:"isCanary"`
+	MaxRuns   int  `json:"maxRuns"`
+	TotalRuns int  `json:"totalRuns"`
 }
 
 type GoalInfo struct {
-	UID         string               `json:"UID"`
-	Solutions   map[string]*Solution `json:"solutions"`
-	Title       string               `json:"title"`
-	Description string               `json:"description"`
-	CreatedAt   int                  `json:"createdAt"`
-	UpdatedAt   int                  `json:"updatedAt"`
+	UID         string `json:"UID"`
+	Title       string `json:"title"`
+	Description string `json:"description"`
+	CreatedAt   int    `json:"createdAt"`
+	UpdatedAt   int    `json:"updatedAt"`
 }
 
 // Do we want to add the ability to
@@ -67,7 +60,7 @@ type Goal[Input any, Output any] struct {
 	Validator     func(*Output) bool `json:"-"`
 	ExampleInput  Input              `json:"exampleInput"`
 	ExampleOutput Output             `json:"exampleOutput"`
-	Prompts       []Prompt           `json:"-"`
+	PromptUIDs    []string           `json:"promptUIDs"`
 }
 
 type Result[T any] struct {

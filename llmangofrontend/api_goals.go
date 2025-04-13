@@ -45,10 +45,15 @@ func (r *APIRouter) handleUpdateGoal(w http.ResponseWriter, req *http.Request) {
 
 		// Save state after updating the goal
 		if r.SaveState != nil {
+			fmt.Printf("SaveState function exists, attempting to save state\n")
 			if err := r.SaveState(); err != nil {
+				fmt.Printf("SaveState failed with error: %v\n", err)
 				ServerError(w, err)
 				return
 			}
+			fmt.Printf("SaveState completed successfully\n")
+		} else {
+			fmt.Printf("SaveState function is nil, skipping state persistence\n")
 		}
 
 		// Return the updated goal as JSON response

@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"sort"
 	"strconv"
 
 	"github.com/llmang/llmango/llmango"
@@ -12,41 +13,27 @@ import (
 
 // handleGetPrompts handles getting all prompts with pagination and optional goal filtering
 func (r *APIRouter) handleGetPrompts(w http.ResponseWriter, req *http.Request) {
-	limit := 10 // default limit
+	limit := -1 // default limit
 	if limitStr := req.Header.Get("limit"); limitStr != "" {
 		if l, err := strconv.Atoi(limitStr); err == nil && l > 0 {
 			limit = l
 		}
 	}
 
-	// Get goal UID from query parameter
-	goalUID := req.URL.Query().Get("goaluid")
+	// Convert map to slice for sorting
+	prompts := make([]*llmango.Prompt, 0, len(r.Prompts))
+	for _, prompt := range r.Prompts {
+		prompts = append(prompts, prompt)
+	}
 
-	// Get all prompts
-	prompts := make(map[string]*llmango.Prompt)
-	for uid, prompt := range r.Prompts {
-		// If goalUID is specified, only include prompts used by that goal
-		if goalUID != "" {
-			usedByGoal := false
-			for _, goal := range r.Goals {
-				if goalInfo, ok := goal.(interface{ GetGoalInfo() *llmango.GoalInfo }); ok {
-					for _, solution := range goalInfo.GetGoalInfo().Solutions {
-						if solution.PromptUID == uid {
-							usedByGoal = true
-							break
-						}
-					}
-				}
-			}
-			if !usedByGoal {
-				continue
-			}
-		}
+	// Sort prompts by UpdatedAt
+	sort.Slice(prompts, func(i, j int) bool {
+		return prompts[i].UpdatedAt > prompts[j].UpdatedAt
+	})
 
-		prompts[uid] = prompt
-		if len(prompts) >= limit {
-			break
-		}
+	// Apply limit if specified
+	if limit > 0 && limit < len(prompts) {
+		prompts = prompts[:limit]
 	}
 
 	json.NewEncoder(w).Encode(prompts)

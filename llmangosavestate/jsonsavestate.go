@@ -40,16 +40,17 @@ func jsonSaveStateFunc(mango *llmango.LLMangoManager, fileName string) error {
 }
 
 // You create an internal LLMang package where you can setup your calls etc this is done manually so that you can use proper goalng structs. You can part it out into different files, you can either place it in your main or you can have it separatly
-func WithJSONSaveState(fileName string, mango *llmango.LLMangoManager) (*llmango.LLMangoManager, error) {
+func WithJSONSaveState(fileName string, llmangoManager *llmango.LLMangoManager) (*llmango.LLMangoManager, error) {
 	if fileName == "" {
 		fileName = "mango.json"
 	}
 
 	//setup savestate Func
 	var saveStateFunc func() error = func() error {
-		return jsonSaveStateFunc(mango, fileName)
+		log.Printf("JSON SAVE FUNCTION TRIGGERING for LLMangoManager: %p", llmangoManager)
+		return jsonSaveStateFunc(llmangoManager, fileName)
 	}
-	mango.SaveState = saveStateFunc
+	llmangoManager.SaveState = saveStateFunc
 
 	// Initialize empty config structure
 	config := &mangoConfigFile{
@@ -70,7 +71,7 @@ func WithJSONSaveState(fileName string, mango *llmango.LLMangoManager) (*llmango
 			return nil, err
 		}
 		log.Printf("INFO: MANGO: new empty config file created at %s", fileName)
-		return mango, nil
+		return llmangoManager, nil
 	}
 
 	if err != nil {
@@ -79,8 +80,9 @@ func WithJSONSaveState(fileName string, mango *llmango.LLMangoManager) (*llmango
 
 	defer file.Close()
 
+	// Decode file contents into config
 	if err := json.NewDecoder(file).Decode(config); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to decode config file: %w", err)
 	}
 
 	if config.Prompts == nil {
@@ -92,37 +94,31 @@ func WithJSONSaveState(fileName string, mango *llmango.LLMangoManager) (*llmango
 	}
 
 	//initialize prompts
-	if mango.Prompts == nil {
-		mango.Prompts = make(map[string]*llmango.Prompt)
+	if llmangoManager.Prompts == nil {
+		llmangoManager.Prompts = make(map[string]*llmango.Prompt)
 	}
 
 	// Ensure prompt UIDs match their map keys
 	for key, prompt := range config.Prompts {
 		if prompt.UID == "" {
 			prompt.UID = key
-			log.Printf("INFO: MANGO: Setting empty prompt UID to match key: %s", key)
 		} else if prompt.UID != key {
 			log.Printf("INFO: MANGO: Updating prompt UID from %s to %s to match key", prompt.UID, key)
 			prompt.UID = key
 		}
 	}
 
-	maps.Copy(mango.Prompts, config.Prompts)
+	maps.Copy(llmangoManager.Prompts, config.Prompts)
 
-	loadConfig(mango, config.Goals)
+	loadConfig(llmangoManager, config.Goals)
 
-	
-	// updateTimestamps(mango)
-
-	// Save the state to persist the timestamp updates
-	err = mango.SaveState()
+	// Save the state to persist any updates
+	err = llmangoManager.SaveState()
 	if err != nil {
-		log.Printf("ERROR: MANGO: Failed to save state after updating timestamps: %v", err)
-	} else {
-		log.Printf("INFO: MANGO: Successfully saved state after updating timestamps")
+		log.Printf("ERROR: MANGO: Failed to save state after loading: %v", err)
 	}
 
-	return mango, nil
+	return llmangoManager, nil
 }
 
 // this will parse the config if there currently is one and load the prompts and solutions into the object
@@ -133,28 +129,25 @@ func loadConfig(m *llmango.LLMangoManager, fileGoalsInfo map[string]*llmango.Goa
 
 	// Iterate through config and update goals
 	for uid, info := range fileGoalsInfo {
-		if goal, ok := m.Goals[uid].(*llmango.Goal[any, any]); ok {
-			// Update UID if needed
-			if goal.UID != uid {
-				log.Printf("INFO: MANGO: Updating goal UID from %s to %s to match key", goal.UID, uid)
-				goal.UID = uid
-			}
+		if goalAny, exists := m.Goals[uid]; exists {
+			if goal, ok := goalAny.(*llmango.Goal[any, any]); ok {
+				// Update UID if needed
+				if goal.UID != uid {
+					goal.UID = uid
+				}
 
-			// Update title and description
-			if info.Title != "" {
-				goal.Title = info.Title
+				// Update title and description
+				if info.Title != "" {
+					goal.Title = info.Title
+				}
+				if info.Description != "" {
+					goal.Description = info.Description
+				}
+			} else {
+				log.Printf("ERROR: MANGO: Could not type assert goal %s as *llmango.Goal[any, any], actual type: %T", uid, goalAny)
 			}
-			if info.Description != "" {
-				goal.Description = info.Description
-			}
-
-			// Initialize and copy solutions
-			if goal.Solutions == nil {
-				goal.Solutions = make(map[string]*llmango.Solution)
-			}
-			if info.Solutions != nil {
-				maps.Copy(goal.Solutions, info.Solutions)
-			}
+		} else {
+			log.Printf("WARN: MANGO: Goal %s from file not found in manager", uid)
 		}
 	}
 
@@ -192,21 +185,6 @@ func updateTimestamps(m *llmango.LLMangoManager) {
 			if goal.UpdatedAt == 0 {
 				goal.UpdatedAt = currentTime
 				log.Printf("INFO: MANGO: Updated UpdatedAt for goal %s", key)
-			}
-
-			// Update timestamps for solutions using map keys
-			for solKey := range goal.Solutions {
-				solution := goal.Solutions[solKey]
-				log.Printf("INFO: MANGO: Solution %s in goal %s has CreatedAt=%d, UpdatedAt=%d",
-					solKey, key, solution.CreatedAt, solution.UpdatedAt)
-				if goal.Solutions[solKey].CreatedAt == 0 {
-					goal.Solutions[solKey].CreatedAt = currentTime
-					log.Printf("INFO: MANGO: Updated CreatedAt for solution %s in goal %s", solKey, key)
-				}
-				if goal.Solutions[solKey].UpdatedAt == 0 {
-					goal.Solutions[solKey].UpdatedAt = currentTime
-					log.Printf("INFO: MANGO: Updated UpdatedAt for solution %s in goal %s", solKey, key)
-				}
 			}
 		} else {
 			log.Printf("ERROR: MANGO: Could not type assert goal %s as *llmango.Goal[any, any]", key)

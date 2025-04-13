@@ -15,8 +15,7 @@
         <a href="{base}/goal">Goals</a>
         <a href="{base}/models">Models</a>
         <a href="{base}/logs">Logs</a>
-        <a>|</a>
-        <!-- Will need to implement model store functionality separately -->
+        <span>|</span>
         <span>
             <span title="OpenRouter models">models</span>
             <span title="Refresh OpenRouter models" style="cursor: pointer; margin-left: 5px;">🔄</span>

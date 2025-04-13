@@ -1,5 +1,4 @@
 <script lang="ts">
-    import { onMount } from 'svelte';
     import type { Goal } from './classes/llmangoAPI.svelte';
 
     let { message, goal = null } = $props<{

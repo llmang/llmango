@@ -8,22 +8,14 @@
 
     let { prompt, goal } = $props<{
         prompt: Prompt;
-        goal?: Goal;
+        goal?: Goal | null;
     }>();
-    
-    onMount(async () => {
-        if (prompt.goalUID && !goal) {
-            try {
-                const fetchedGoal = await llmangoAPI.getGoal(prompt.goalUID);
-                if (fetchedGoal) {
-                    goal = fetchedGoal;
-                }
-            } catch (error) {
-                // Do nothing if the request errors
-                console.error('Failed to fetch goal:', error);
-            }
+
+    onMount(()=>{
+        if (!goal && prompt.goalUID && llmangoAPI?.goals[prompt.goalUID]){
+            goal=llmangoAPI.goals[prompt.goalUID]
         }
-    });
+    })
 </script>
 
 <Card 

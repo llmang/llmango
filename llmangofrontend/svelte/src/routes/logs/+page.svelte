@@ -4,7 +4,7 @@
     import LogTable from '$lib/LogTable.svelte';
     import { fade } from 'svelte/transition';
     import FilterSelect from '$lib/FilterSelect.svelte';
-    import { onMount, untrack } from 'svelte';
+    import { onMount } from 'svelte';
     
     // Page state
     let logs = $state<Log[]>([]);
@@ -16,10 +16,6 @@
         total: 0,
         perPage: 10
     });
-    
-    // Goals and prompts for filters
-    let goals = $state<Record<string, Goal>>({});
-    let prompts = $state<Record<string, Prompt>>({});
     
     // Filter state
     let filter = $state<LogFilter>({
@@ -77,9 +73,7 @@
         logsLoading = true;
         isMounted=false
         try {
-            // Load goals and prompts for filters
-            goals = await llmangoAPI.getAllGoals();
-            prompts = await llmangoAPI.getAllPrompts();
+            llmangoAPI.initialize()
             isMounted=true
         } catch (error) {
             console.error('Failed to initialize:', error);
@@ -99,13 +93,13 @@
             <div class="filter-selects">
             <FilterSelect id="goalFilter" label="Goal" bind:value={filter.goalUID}>
                 <option value={undefined}>All Goals</option>
-                {#each Object.entries(goals) as [id, goal]}
+                {#each Object.entries(llmangoAPI.goals) as [id, goal]}
                     <option value={id}>{goal.title || id}</option>
                 {/each}
             </FilterSelect>
             <FilterSelect id="promptFilter" label="Prompt" bind:value={filter.promptUID}>
                 <option value={undefined}>All Prompts</option>
-                {#each Object.entries(prompts) as [id, prompt]}
+                {#each Object.entries(llmangoAPI.prompts) as [id, prompt]}
                     <option value={id}>{prompt.UID || id}</option>
                 {/each}
             </FilterSelect>
@@ -123,7 +117,7 @@
     <!-- Loading indicator -->
     <LogTable logs={logs || []} cells={paginationResponse.perPage} />
     <!-- Pagination -->
-    {#if paginationResponse.totalPages > 1 || paginationResponse.totalLogs > 0}
+    {#if paginationResponse.totalPages > 1 || paginationResponse.total > 0}
         <div class="pagination">
             <button 
                 onclick={prevPage}

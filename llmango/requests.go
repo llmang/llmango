@@ -15,57 +15,54 @@ func Run[I, R any](l *LLMangoManager, g *Goal[I, R], input *I) (*R, error) {
 	// Record start time for request timing
 	requestStartTime := float64(time.Now().UnixNano()) / 1e9
 	var res R
-	validSolutions := make(map[string]*Solution)
+	validPrompts := make(map[string]*Prompt)
 	totalWeight := 0
 
-	for uid, solution := range g.Solutions {
-		if solution.Weight > 0 {
-			if solution.IsCanary {
-				if solution.TotalRuns < solution.MaxRuns {
-					validSolutions[uid] = solution
-					totalWeight += solution.Weight
+	for _, promptUID := range g.PromptUIDs {
+		prompt, exists := l.Prompts[promptUID]
+		if !exists {
+			continue
+		}
+
+		if prompt.Weight > 0 {
+			if prompt.IsCanary {
+				if prompt.TotalRuns < prompt.MaxRuns {
+					validPrompts[promptUID] = prompt
+					totalWeight += prompt.Weight
 				}
 			} else {
-				validSolutions[uid] = solution
-				totalWeight += solution.Weight
+				validPrompts[promptUID] = prompt
+				totalWeight += prompt.Weight
 			}
 		}
 	}
 
-	var selectedSolution *Solution
-	if len(validSolutions) == 0 {
-		return nil, errors.New("there are no valid solutions for this goal, canaries may all have ran out and no base prompt is available")
+	var selectedPrompt *Prompt
+	if len(validPrompts) == 0 {
+		return nil, errors.New("there are no valid prompts for this goal, canaries may all have ran out and no base prompt is available")
 	}
 
 	randWeight := rand.Intn(totalWeight)
 	currentWeight := 0
 
-	for _, solution := range validSolutions {
-		currentWeight += solution.Weight
+	for _, prompt := range validPrompts {
+		currentWeight += prompt.Weight
 		if randWeight < currentWeight {
-			selectedSolution = solution
-			if selectedSolution.IsCanary {
-				selectedSolution.TotalRuns++ // Directly increment the reference
+			selectedPrompt = prompt
+			if selectedPrompt.IsCanary {
+				selectedPrompt.TotalRuns++ // Directly increment the reference
 			}
 			break
 		}
 	}
 
-	if selectedSolution == nil {
-		return nil, errors.New("failed to select solution after looping over solutions either no valid solutions or ")
-	}
-	//get the selected solution from the prompts list
-	prompt, valid := l.Prompts[selectedSolution.PromptUID]
-	if !valid {
-		return nil, &ResultError{
-			Reason:  "PromptUID could not be found in the prompts map? may be corrupted or missing",
-			Message: "error occured getting prompt",
-		}
+	if selectedPrompt == nil {
+		return nil, errors.New("failed to select prompt after looping over prompts")
 	}
 
 	//here we have to use a helper func to replace {{val}} with struct field vals
 	//we want to reflect the input vals into a map of string to val then loop over them and regex the prompt mesages for {{string}} where not /{{}} valid everything ofcourse
-	updatedMessages, err := ParseMessages(input, prompt.Messages)
+	updatedMessages, err := ParseMessages(input, selectedPrompt.Messages)
 	if err != nil {
 		return nil, fmt.Errorf("failed to update prompt messages with err: %w", err)
 	}
@@ -73,8 +70,8 @@ func Run[I, R any](l *LLMangoManager, g *Goal[I, R], input *I) (*R, error) {
 	routerRequest := &openrouter.OpenRouterRequest{
 		Messages:   updatedMessages,
 		Prompt:     nil,
-		Model:      &prompt.Model,
-		Parameters: prompt.Parameters,
+		Model:      &selectedPrompt.Model,
+		Parameters: selectedPrompt.Parameters,
 	}
 
 	//we need to add the json struct schme of the output and turn on the paramters for strucuttred json output
@@ -153,7 +150,7 @@ func Run[I, R any](l *LLMangoManager, g *Goal[I, R], input *I) (*R, error) {
 	// Log in a separate goroutine if logging is enabled
 	if l.Logging != nil && l.Logging.LogResponse != nil {
 		// Create log object
-		logEntry, logErr := createLogObject(l, &g.GoalInfo, prompt.UID, input, &res, openrouterResponse, requestTimeElapsed, err)
+		logEntry, logErr := createLogObject(l, &g.GoalInfo, selectedPrompt.UID, input, &res, openrouterResponse, requestTimeElapsed, err)
 		if logErr != nil {
 			fmt.Printf("Failed to create log object: %v", logErr)
 		} else {

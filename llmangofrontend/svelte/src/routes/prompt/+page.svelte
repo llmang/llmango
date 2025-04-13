@@ -2,20 +2,17 @@
     import { onMount } from 'svelte';
     import { llmangoAPI, type Prompt } from '$lib/classes/llmangoAPI.svelte';
     import PromptCard from '$lib/PromptCard.svelte';
-    import CreatePromptModal from '$lib/CreatePromptModal.svelte';
     
-    let prompts: Record<string, Prompt> = $state({});
     let searchTerm: string = $state('');
     let loading: boolean = $state(true);
-    let newPromptOpen = $state(false);
     
     const filteredPrompts = $derived.by(() => {
         if (!searchTerm.trim()) {
-            return Object.values(prompts);
+            return Object.values(llmangoAPI.prompts);
         }
         
         const term = searchTerm.toLowerCase();
-        return Object.values(prompts).filter(prompt => 
+        return Object.values(llmangoAPI.prompts).filter(prompt => 
             prompt.UID?.toLowerCase().includes(term) || 
             prompt.model?.toLowerCase().includes(term)
         );
@@ -23,26 +20,13 @@
     
     onMount(async () => {
         try {
-            prompts = await llmangoAPI.getAllPrompts();
+            await llmangoAPI.initialize()
             loading = false;
         } catch (error) {
             console.error('Error loading prompts:', error);
             loading = false;
         }
     });
-
-    const newPrompt = () => {
-        newPromptOpen = true;
-    }
-
-    const handleClose = () => {
-        newPromptOpen = false;
-    }
-
-    const handleSave = async (prompt: Prompt) => {
-        // Refresh the prompts list after saving
-        prompts = await llmangoAPI.getAllPrompts();
-    }
 </script>
 
 <svelte:head>
@@ -59,10 +43,7 @@
         placeholder="Search prompts by UID or model..." 
     />
     <div class="card-container">
-        <button onclick={newPrompt} class="card new-item-card">
-            <div>+</div>
-            <div>Create New Prompt</div>
-        </button>
+
     {#if loading}
         <div class="loading">Loading prompts...</div>
     {:else if filteredPrompts.length === 0}
@@ -73,11 +54,4 @@
             {/each}
     {/if}
 </div>
-
-<CreatePromptModal 
-    isOpen={newPromptOpen}
-    mode="create"
-    onClose={handleClose}
-    onSave={handleSave}
-/>
 </div>

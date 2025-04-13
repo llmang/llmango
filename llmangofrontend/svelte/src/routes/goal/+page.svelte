@@ -7,12 +7,9 @@
     import { llmangoAPI, type Goal } from '$lib/classes/llmangoAPI.svelte';
     import GoalCard from '$lib/GoalCard.svelte';
     
-    let goals: Goal[] = $state([]);
     let searchTerm: string = $state('');
     let loading: boolean = $state(true);
-    
-    const filteredGoals = $derived(
-        goals.filter(goal => 
+    const filteredGoals = $derived( Object.values(llmangoAPI.goals).filter((goal: Goal) => 
             !searchTerm.trim() || 
             goal.title?.toLowerCase().includes(searchTerm.toLowerCase()) || 
             goal.description?.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -22,11 +19,11 @@
     
     onMount(async () => {
         try {
-            const goalsMap = await llmangoAPI.getAllGoals();
-            goals = Object.values(goalsMap);
-            loading = false;
+            await llmangoAPI.initialize()
+            console.log("intiialized")
         } catch (error) {
             console.error('Error loading goals:', error);
+        }finally{
             loading = false;
         }
     });

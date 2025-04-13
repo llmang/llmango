@@ -24,11 +24,6 @@ func (router *Router) CreateAPIRouter() *http.ServeMux {
 	apiMux.HandleFunc("GET /goal/{goaluid}", r.handleGetGoal)
 	apiMux.HandleFunc("POST /goal/{goaluid}/update", r.handleUpdateGoal)
 
-	// Solution endpoints
-	apiMux.HandleFunc("POST /solution/create", r.handleCreateSolution)
-	apiMux.HandleFunc("POST /solutions/{solutionuid}/update", r.handleUpdateSolution)
-	apiMux.HandleFunc("POST /solutions/{solutionuid}/delete", r.handleDeleteSolution)
-
 	// Prompt endpoints
 	apiMux.HandleFunc("GET /prompts", r.handleGetPrompts)
 	apiMux.HandleFunc("GET /prompts/{promptuid}", r.handleGetPrompt)

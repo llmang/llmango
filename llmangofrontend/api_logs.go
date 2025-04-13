@@ -10,12 +10,13 @@ import (
 
 // LogFilter represents the filter parameters for log queries
 type LogFilter struct {
-	goalUID   string `json:"goalUID,omitempty"`
+	GoalUID   string `json:"goalUID,omitempty"`
 	PromptUID string `json:"promptUID,omitempty"`
 	Level     string `json:"level,omitempty"`
 	Page      int    `json:"page"`
 	PerPage   int    `json:"perPage"`
 }
+
 
 // PaginationResponse represents pagination information for API responses
 type PaginationResponse struct {

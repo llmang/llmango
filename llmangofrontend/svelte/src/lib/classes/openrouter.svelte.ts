@@ -17,15 +17,12 @@ export interface OpenRouterModel {
 
 class OpenRouter {
     models = $state<OpenRouterModel[]>([]);
+    modelsMap = $state<Record<string, OpenRouterModel>>({});
     loading = $state(false);
     error = $state<string | null>(null);
     lastFetched = $state<string | null>(null);
     hasModels = $state(false);
     initialized = $state<Promise<boolean> | null>(null);
-    
-    constructor() {
-        // We don't auto-initialize in constructor, must call initialize()
-    }
     
     // Initialize the store with cached data and optionally fetch fresh data
     initialize = async (): Promise<boolean> => {
@@ -35,11 +32,11 @@ class OpenRouter {
         }
         
         // Create a new initialization promise
-        this.initialized = this._initialize();
+        this.initialized = this.#initialize();
         return this.initialized;
     }
     
-    private async _initialize(): Promise<boolean> {
+    #initialize = async (): Promise<boolean> => {
         // Try to load from cache first
         const cached = localStorage.getItem('openrouter_models');
         
@@ -49,13 +46,15 @@ class OpenRouter {
                 this.models = data.models || [];
                 this.lastFetched = data.lastFetched;
                 this.hasModels = (data.models || []).length > 0;
+                // Build the models map
+                this.#buildModelsMap();
             } catch (err) {
                 console.error('Error parsing cached models:', err);
             }
         }
 
         // If we have models and the cache isn't stale, return early
-        if (this.models.length > 0 && !this._isCacheStale()) {
+        if (this.models.length > 0 && !this.#isCacheStale()) {
             return true;
         }
         
@@ -64,13 +63,22 @@ class OpenRouter {
     }
     
     // Check if the cache is stale (older than 24 hours)
-    private _isCacheStale(): boolean {
+    #isCacheStale = (): boolean => {
         if (!this.lastFetched) return true;
         
         const lastFetchedDate = new Date(this.lastFetched);
         const now = new Date();
         // Check if last fetch was more than 24 hours ago
         return (now.getTime() - lastFetchedDate.getTime()) > (24 * 60 * 60 * 1000);
+    }
+    
+    // Build the models map for efficient lookup
+    #buildModelsMap = (): void => {
+        const map: Record<string, OpenRouterModel> = {};
+        for (const model of this.models) {
+            map[model.id] = model;
+        }
+        this.modelsMap = map;
     }
     
     // Load models (initialize if needed)
@@ -99,6 +107,9 @@ class OpenRouter {
             this.hasModels = this.models.length > 0;
             this.lastFetched = new Date().toISOString();
             
+            // Build the models map
+            this.#buildModelsMap();
+            
             // Save to localStorage for caching
             localStorage.setItem('openrouter_models', JSON.stringify({
                 models: this.models,
@@ -126,6 +137,16 @@ class OpenRouter {
                 model.name.toLowerCase().includes(lowerQuery)
             )
             .sort((a, b) => b.created - a.created);
+    }
+
+    // Check if a model ID exists
+    hasModel = (modelId: string): boolean => {
+        return modelId in this.modelsMap;
+    }
+
+    // Get a model by ID
+    getModel = (modelId: string): OpenRouterModel | undefined => {
+        return this.modelsMap[modelId];
     }
 }
 
