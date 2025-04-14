@@ -183,6 +183,10 @@ func ValidateNonStreamingResponse(respBody []byte, statusCode int) (*NonStreamin
 			stdErr = fmt.Errorf("unhandled error code %d: %s",
 				errResp.Details.Code, errResp.Details.Message)
 		}
+		// If it's a 400 Bad Request, include the full response body for debugging
+		if errors.Is(stdErr, ErrBadRequest) {
+			return nil, fmt.Errorf("%w: %s | Full response: %s", stdErr, errResp.Details.Message, string(respBody))
+		}
 		return nil, fmt.Errorf("%w: %s", stdErr, errResp.Details.Message)
 	}
 

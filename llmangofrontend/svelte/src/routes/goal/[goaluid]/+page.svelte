@@ -17,17 +17,16 @@
     let goaluid = $derived(page.params.goaluid);
 
     // Initial states with safe defaults
-    let goal = $derived(llmangoAPI?.goals?.[goaluid])
-    let prompts = $derived(llmangoAPI?.promptsByGoalUID?.[goaluid] || null)
-    let loading = $state(true);
+    let goal = $derived<Goal | undefined>(llmangoAPI?.goals?.[goaluid]);
+    let prompts = $derived<Prompt[] | null>(llmangoAPI?.promptsByGoalUID?.[goaluid] || null);
+    let loading = $state<boolean>(true);
     let error = $state<string | null>(null);
     let logs = $state<Log[]>([]);  // Initialize as empty array
-    let logsLoading = $state(false);
-    
+    let logsLoading = $state<boolean>(false);
     // Modal state
-    let promptModalOpen = $state(false);
+    let promptModalOpen = $state<boolean>(false);
     let modalPrompt = $state<Prompt | null>(null);
-    let isViewMode = $state(false);
+    let isViewMode = $state<boolean>(false);
     
     // Load data on component mount
     onMount(async () => {
@@ -45,36 +44,14 @@
             error = e instanceof Error ? e.message : 'Failed to load data';
         }finally{
             loading = false;
+            logsLoading=false
         }
     });
-
-    // Added helper function to compute solution status badge
-    function getPromptStatus(prompt: Prompt): { label: string, dotColor: string, bgColor: string } {
-        if (prompt.weight === 0) {
-            return { label: "Stopped", dotColor: "#6c757d", bgColor: "#e9ecef" };
-        }
-        if (prompt.isCanary) {
-            if (prompt.totalRuns >= prompt.maxRuns) {
-                return { label: "Completed", dotColor: "#007bff", bgColor: "#cce5ff" };
-            } else {
-                return { label: "In Progress", dotColor: "#fd7e14", bgColor: "#ffe5d1" };
-            }
-        } else {
-            return { label: "Running", dotColor: "#28a745", bgColor: "#d4edda" };
-        }
-    }
 
     // Open modal to create a new prompt
     function openCreatePromptModal() {
         modalPrompt = null;
         isViewMode = false;
-        promptModalOpen = true;
-    }
-
-    // Open modal to view an existing prompt (read-only)
-    function openViewPromptModal(prompt: Prompt) {
-        modalPrompt = prompt;
-        isViewMode = true;
         promptModalOpen = true;
     }
 </script>
@@ -90,16 +67,16 @@
         </div>
     {:else}
         <div class="page-header">
-            <h1>{goal.title}</h1>
-            <p class="description">{goal.description}</p>
+            <h1>{goal?.title}</h1>
+            <p class="description">{goal?.description}</p>
         </div>
 
         <div class="meta-info">
             <div class="meta-item">
-                <strong>Goal ID:</strong> {goal.UID}
+                <strong>Goal ID:</strong> {goal?.UID}
             </div>
             <div class="meta-item">
-                <strong>Prompts:</strong> {prompts.length}
+                <strong>Prompts:</strong> {prompts?.length}
             </div>
         </div>
 
@@ -107,11 +84,11 @@
         <div class="examples">
             <div class="example-panel">
                 <div class="item-title">Input</div>
-                <pre>{JSON.stringify(goal.exampleInput, null, 2)}</pre>
+                <pre>{JSON.stringify(goal?.exampleInput, null, 2)}</pre>
             </div>
             <div class="example-panel">
                 <div class="item-title">Output</div>
-                <pre>{JSON.stringify(goal.exampleOutput, null, 2)}</pre>
+                <pre>{JSON.stringify(goal?.exampleOutput, null, 2)}</pre>
             </div>
         </div>
 
@@ -123,21 +100,13 @@
             </div>
         {:else}
             <div class="card-container">
-                <button onclick={()=>promptModalOpen=true} class="card new-item-card">
+                <button onclick={openCreatePromptModal} class="card new-item-card">
                     <div>+</div>
                     <div>Create New Prompt</div>
                 </button>
                 {#each prompts as prompt}
                     <div class="prompt-card-wrapper">
-                        {#if true}
-                            {@const status = getPromptStatus(prompt)}
-                            <div class="status-badge" style="background-color: {status.bgColor}">
-                                <span class="badge-dot" style="background-color: {status.dotColor}"></span>
-                                <span class="badge-label">{status.label}</span>
-                            </div>
-                        {/if}
-                        <PromptCard {prompt}/>
-                        <button class="edit-button" onclick={() => openViewPromptModal(prompt)}>Edit</button>
+                        <PromptCard {prompt} editable={true} />
                     </div>
                 {/each}
             </div>
@@ -159,14 +128,6 @@
             <FormatJson jsonText={JSON.stringify(goal)} />
         </details>
     {/if}
-<!--     
-    {:else}
-        <div class="error">
-            <h2>Goal Not Found</h2>
-            <p>The requested goal could not be found.</p>
-            <a href="{base}/goal">Back to Goals</a>
-        </div>
-    {/if} -->
 </div>
 
 <!-- Prompt Modal -->
@@ -185,20 +146,7 @@
         height: fit-content;
         width: fit-content;
     }
-    .edit-button{
-        position: absolute;
-        top:.5rem;
-        right:.5rem;
-        background-color: #e9ecef;
-        border: 1px solid #ced4da;
-        color: #495057;
-        border-radius: 4px;
-        cursor: pointer;
-        transition: all 0.2s ease;
-        padding:.25em 1em;
-        font-weight: 600;
-        font-size: 1rem;
-    }
+    
     .goal-page {
         max-width: 1200px;
         margin: 0 auto;
@@ -256,7 +204,6 @@
         margin: 2rem 0;
     }
     
-    
     .goal-debug {
         border-top: 1px solid #eee;
         padding-top: 0.5rem;
@@ -273,37 +220,5 @@
         text-align: center;
         color: #777;
         font-style: italic;
-    }
-    
-    .badge-label {
-        margin-right: 4px;
-    }
-    .badge-dot {
-        width: 8px;
-        height: 8px;
-        border-radius: 50%;
-    }
-    
-    /* Status badge styles */
-    .status-badge {
-        position: absolute;
-        top: 10px;
-        right: 10px;
-        display: flex;
-        align-items: center;
-        padding: 2px 8px;
-        border-radius: 12px;
-        font-size: 0.75rem;
-        color: #333;
-    }
-    
-    .badge-label {
-        margin-left: 4px;
-    }
-    
-    .badge-dot {
-        width: 8px;
-        height: 8px;
-        border-radius: 50%;
     }
 </style> 

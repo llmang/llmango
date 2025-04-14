@@ -2,7 +2,6 @@ package llmangologger
 
 import (
 	"errors"
-	"fmt"
 	"log"
 
 	"github.com/llmang/llmango/llmango"
@@ -36,7 +35,7 @@ func UseLogger(m *llmango.LLMangoManager, logger *log.Logger, opts *MangoLogging
 
 func UseConsoleLogging(m *llmango.LLMangoManager, opts *MangoLoggingOptions) error {
 	m.LogResponse = func(mangolog *llmango.LLMangoLog) error {
-		fmt.Printf("MANGO: %v\n", mangolog)
+		log.Printf("MANGO: %v\n", mangolog)
 		return nil
 	}
 	m.GetLogs = nil

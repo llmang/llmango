@@ -1,10 +1,26 @@
-
 /* Apply box-sizing to all elements and their pseudo-elements */
 *, *::before, *::after {
     box-sizing: border-box;
 }
 :root{
-    --go-color:#6ad6e3
+    --go-color:#6ad6e3;
+    
+    /* Status colors */
+    --color-danger: #dc3545;
+    --color-success: #28a745;
+    --color-secondary: #6c757d;
+    
+    /* Text colors */
+    --color-text-primary: #333;
+    --color-text-secondary: #666;
+    
+    /* Background colors */
+    --color-bg-light: #f8f8f8;
+    --color-bg-secondary: #e9ecef;
+    
+    /* Button colors */
+    --color-primary: #007bff;
+    --color-primary-dark: #0056b3;
 }
 
 

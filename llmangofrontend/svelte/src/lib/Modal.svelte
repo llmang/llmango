@@ -13,6 +13,7 @@
     
     $effect(() => {
         isOpen ? document.body.style.overflow = 'hidden' : document.body.style.overflow = 'unset'
+        return (()=>document.body.style.overflow = 'unset')
     });
 </script>
 

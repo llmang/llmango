@@ -261,6 +261,9 @@ func (r *APIRouter) handleUpdatePrompt(w http.ResponseWriter, req *http.Request)
 		Model      string            `json:"model"`
 		Parameters map[string]any    `json:"parameters"`
 		Messages   []json.RawMessage `json:"messages"`
+		Weight     int               `json:"weight"`
+		IsCanary   bool              `json:"isCanary"`
+		MaxRuns    int               `json:"maxRuns"`
 	}
 
 	if err := json.NewDecoder(req.Body).Decode(&updateReq); err != nil {
@@ -270,6 +273,9 @@ func (r *APIRouter) handleUpdatePrompt(w http.ResponseWriter, req *http.Request)
 
 	// Update prompt
 	prompt.Model = updateReq.Model
+	prompt.Weight = updateReq.Weight
+	prompt.IsCanary = updateReq.IsCanary
+	prompt.MaxRuns = updateReq.MaxRuns
 
 	// Handle parameters
 	if updateReq.Parameters != nil {

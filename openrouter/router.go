@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 )
 
@@ -67,7 +68,7 @@ func (or *OpenRouterRouter) openRouterChat(w http.ResponseWriter, r *http.Reques
 	// Generate non-streaming response
 	response, err := or.OpenRouter.GenerateNonStreamingChatResponse(&request)
 	if err != nil {
-		fmt.Printf("OPENROUTER:CHAT: failed to generate response with error message: %v", err)
+		log.Printf("OPENROUTER:CHAT: failed to generate response with error message: %v", err)
 		http.Error(w, "error generating response", http.StatusInternalServerError)
 		return
 	}

@@ -193,6 +193,18 @@
         {/if}
 
         <form onsubmit={(e) => { e.preventDefault(); handleSubmit(); }}>
+            <div class="form-group">
+                <label for="weight">Weight</label>
+                <input 
+                    type="number" 
+                    id="weight" 
+                    bind:value={formData.weight} 
+                    min="0"
+                    step="0.1"
+                    class="form-control"
+                />
+                <small>Higher weight means this prompt will be used more often</small>
+            </div>
             <!-- Canary Options Section (now first) -->
             <div class="canary-section">
                 <h3>Canary Testing</h3>
@@ -201,7 +213,6 @@
                         <input 
                             type="checkbox" 
                             bind:checked={formData.isCanary} 
-                            disabled={!isNewPrompt}
                         />
                         Use as canary test
                     </label>
@@ -259,20 +270,6 @@
                             {/each}
                         </select>
                     {/if}
-                </div>
-
-                <!-- Weight -->
-                <div class="form-group">
-                    <label for="weight">Weight</label>
-                    <input 
-                        type="number" 
-                        id="weight" 
-                        bind:value={formData.weight} 
-                        min="0"
-                        step="0.1"
-                        class="form-control"
-                    />
-                    <small>Higher weight means this prompt will be used more often</small>
                 </div>
 
                 <!-- Parameters -->
@@ -353,11 +350,15 @@
                         <label>Goal Variables</label>
                         {#if goalLoading}
                             <div class="loading-placeholder">Loading goal data...</div>
-                        {:else if goalData && goalData.exampleInput}
+                        {:else if goal && goal.exampleInput}
                             <div class="goal-variables">
-                                <h4>Example Input for {goalData.title || 'Goal'}</h4>
-                                <pre class="example-input">{JSON.stringify(goalData.exampleInput, null, 2)}</pre>
-                                <p class="variables-help">You can use these variables in your messages with the syntax <code>{"{{variable.path}}"}</code></p>
+                                <h4>Example Input for {goal.title || 'Goal'}</h4>
+                                <div class="example-input">
+                                    {#each Object.keys(goal.exampleInput) as key}
+                                        <code class="variable-key">{`{{${key}}}`}</code>
+                                    {/each}
+                                </div>
+                                <p class="variables-help">You can use these variables in your messages with the syntax <code>{"{{variableName}}"}</code></p>
                             </div>
                         {:else}
                             <div class="loading-placeholder">No example input available for this goal</div>
@@ -402,7 +403,7 @@
                             <div class="preview">
                                 <span class="preview-label">Preview</span>
                                 <div class="preview-content">
-                                    <PromptMessageFormatter message={message.content} goal={goalData} />
+                                    <PromptMessageFormatter message={message.content} {goal} />
                                 </div>
                             </div>
                             
@@ -452,6 +453,11 @@
 </Modal>
 
 <style>
+
+    .variable-key{
+        background: rgba(0, 0, 255, 0.201)
+
+    }
     .prompt-modal {
        width: 60rem;
        max-width: 100%;
@@ -722,6 +728,8 @@
     }
     
     .example-input {
+        display: flex;
+        gap: 1rem;
         background-color: #f0f0f0;
         padding: 0.5rem;
         border-radius: 3px;
@@ -746,9 +754,12 @@
     }
     
 
-
+    h3{
+        margin-top:0;
+        }
     /* Add this new style for the canary section */
     .canary-section {
+
         background: #f8f9fa;
         padding: 1rem;
         border-radius: 4px;

@@ -73,7 +73,8 @@
         try {
             await llmangoAPI.deletePrompt(promptuid);
             // Redirect to prompts list
-            goto(base+"/prompts")
+            
+            goto(base+"/prompt")
         } catch (e) {
             error = e instanceof Error ? e.message : 'Failed to delete prompt';
         }

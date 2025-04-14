@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log"
 	"math/rand"
 	"regexp"
 	"time"
@@ -39,7 +40,7 @@ func Run[I, R any](l *LLMangoManager, g *Goal[I, R], input *I) (*R, error) {
 
 	var selectedPrompt *Prompt
 	if len(validPrompts) == 0 {
-		return nil, errors.New("there are no valid prompts for this goal, canaries may all have ran out and no base prompt is available")
+		return nil, fmt.Errorf("there are no valid prompts for goal: %v \n Canaries may have finished and no base prompt is present.", g.UID)
 	}
 
 	randWeight := rand.Intn(totalWeight)
@@ -89,26 +90,17 @@ func Run[I, R any](l *LLMangoManager, g *Goal[I, R], input *I) (*R, error) {
 		return nil, err
 	}
 
-	// Use the schema in the response format
-	schemaObject := struct {
-		Name   string          `json:"name"`
-		Schema json.RawMessage `json:"schema"`
-		Strict bool            `json:"strict"`
-	}{
-		Name:   regexp.MustCompile(`[^a-zA-Z0-9]+`).ReplaceAllString(g.Title, "_"),
-		Strict: true,
-		Schema: schemaBytes,
+	// Create a simplified response format structure with the JSON schema
+	responseFormat := map[string]interface{}{
+		"type": "json_schema",
+		"json_schema": map[string]interface{}{
+			"name":   regexp.MustCompile(`[^a-zA-Z0-9]+`).ReplaceAllString(g.Title, "_"),
+			"schema": json.RawMessage(schemaBytes),
+			"strict": true,
+		},
 	}
 
-	responseFormat := struct {
-		Type   string      `json:"type"`
-		Schema interface{} `json:"json_schema"`
-	}{
-		Type:   "json_schema",
-		Schema: schemaObject,
-	}
-
-	// Add it to the request object
+	// Marshal the response format to JSON
 	bytes, err := json.Marshal(responseFormat)
 	if err != nil {
 		return nil, err
@@ -137,9 +129,16 @@ func Run[I, R any](l *LLMangoManager, g *Goal[I, R], input *I) (*R, error) {
 		}
 	}
 
+	if err != nil {
+		return nil, fmt.Errorf("error generating response from OpenRouter: %w", err)
+	}
+	if openrouterResponse == nil {
+		return nil, errors.New("received nil response from OpenRouter without error")
+	}
+
 	if openrouterResponse.Choices != nil && openrouterResponse.Choices[0].Message.Content != nil {
 		if err := json.Unmarshal([]byte(*openrouterResponse.Choices[0].Message.Content), &res); err != nil {
-			return nil, fmt.Errorf("failed to decode response content: %w", err)
+			return nil, fmt.Errorf("failed to decode response content: %w, %s", err, *openrouterResponse.Choices[0].Message.Content)
 		}
 	}
 
@@ -152,12 +151,12 @@ func Run[I, R any](l *LLMangoManager, g *Goal[I, R], input *I) (*R, error) {
 		// Create log object
 		logEntry, logErr := createLogObject(l, &g.GoalInfo, selectedPrompt.UID, input, &res, openrouterResponse, requestTimeElapsed, err)
 		if logErr != nil {
-			fmt.Printf("Failed to create log object: %v", logErr)
+			log.Printf("Failed to create log object: %v", logErr)
 		} else {
 			// Log asynchronously
-			go func(log *LLMangoLog) {
-				if logErr := l.Logging.LogResponse(log); logErr != nil {
-					fmt.Printf("Failed to log response: %v", logErr)
+			go func(mangoLog *LLMangoLog) {
+				if logErr := l.Logging.LogResponse(mangoLog); logErr != nil {
+					log.Printf("Failed to log response: %v", logErr)
 				}
 			}(logEntry)
 		}

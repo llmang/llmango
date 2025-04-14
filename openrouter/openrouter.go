@@ -72,7 +72,7 @@ var JSONSchemaStringResponseFormat = "json_schema"
 type Parameters struct {
 	// Allows to force the model to produce specific output format
 	// See models page and note on this docs page for which models support it
-	ResponseFormat any `json:"response_format,omitempty"`
+	ResponseFormat json.RawMessage `json:"response_format,omitempty"`
 
 	Stop []string `json:"stop,omitempty"` // String(s) to stop generation at
 	// Note: Spec says string | string[], using []string for simplicity. API likely handles it.
@@ -524,8 +524,6 @@ var ErrGenerationIDNotFound = errors.New("generation information for this genera
 // GetGenerationStats retrieves detailed information about a generation by its ID
 // WARNING: You must wait around 400 ms before calling the generation stats endpoint else you will get a 404 error
 func (o *OpenRouter) GetGenerationStats(generationID string) (*GenerationStats, error) {
-	fmt.Printf("GetGenerationStats called with generation ID: %s", generationID)
-
 	// time.Sleep(800 * time.Millisecond)
 	if o.ApiKey == "" {
 		return nil, errors.New("API KEY is empty in openrouter instance")
@@ -548,11 +546,6 @@ func (o *OpenRouter) GetGenerationStats(generationID string) (*GenerationStats, 
 
 	// Set headers
 	req.Header.Set("Authorization", "Bearer "+o.ApiKey)
-
-	fmt.Printf("Making request to OpenRouter API - URL: %s, Headers: %+v",
-		req.URL.String(),
-		map[string]string{"Authorization": "Bearer [REDACTED]"})
-
 	// Send the request
 	client := &http.Client{Timeout: 30 * time.Second}
 	resp, err := client.Do(req)
@@ -567,8 +560,6 @@ func (o *OpenRouter) GetGenerationStats(generationID string) (*GenerationStats, 
 		return nil, fmt.Errorf("error reading response body: %w", err)
 	}
 
-	fmt.Printf("Received response - Status: %d, Body: %s", resp.StatusCode, string(body))
-
 	// Check for non-success status code
 	if resp.StatusCode != http.StatusOK {
 		if resp.StatusCode == http.StatusNotFound {
@@ -582,11 +573,5 @@ func (o *OpenRouter) GetGenerationStats(generationID string) (*GenerationStats, 
 	if err := json.Unmarshal(body, &statsResponse); err != nil {
 		return nil, fmt.Errorf("error parsing generation stats response: %w\nBody: %s", err, string(body))
 	}
-
-	fmt.Printf("Successfully parsed generation stats - ID: %s, Model: %s, Total Cost: %f",
-		statsResponse.Data.ID,
-		statsResponse.Data.Model,
-		statsResponse.Data.TotalCost)
-
 	return &statsResponse.Data, nil
 }
