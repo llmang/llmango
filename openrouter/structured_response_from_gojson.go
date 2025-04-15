@@ -1,4 +1,4 @@
-package llmango
+package openrouter
 
 //https://github.com/reVrost/go-openrouter/blob/main/jsonschema/json.go
 // Package jsonschema provides very simple functionality for representing a JSON schema as a

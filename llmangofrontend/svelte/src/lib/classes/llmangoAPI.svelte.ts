@@ -69,7 +69,16 @@ export class PromptParameters {
 class LLMangoAPI{
     prompts = $state<Record<string, Prompt>>({});
     goals = $state<Record<string, Goal>>({});
-    promptsByGoalUID = $state<Record<string, Prompt[]>>({});
+    promptsByGoalUID = $derived.by<Record<string, Prompt[]>>(() => {
+        const result: Record<string, Prompt[]> = {};
+        Object.values(this.prompts).forEach((prompt) => {
+            if (!result[prompt.goalUID]) {
+                result[prompt.goalUID] = [];
+            }
+            result[prompt.goalUID].push(prompt);
+        });
+        return result;
+    })
     isLoaded = false;
     private baseUrl: string;
     private initializationPromise: Promise<void> | null = null;
@@ -112,14 +121,6 @@ class LLMangoAPI{
             const promptsData = await promptsResponse.json();
             this.prompts = promptsData.reduce((acc: Record<string, Prompt>, prompt: Prompt) => {
                 acc[prompt.UID] = prompt;
-                return acc;
-            }, {});
-
-            this.promptsByGoalUID = promptsData.reduce((acc: Record<string, Prompt[]>, prompt: Prompt) => {
-                if (!acc[prompt.goalUID]) {
-                    acc[prompt.goalUID] = [];
-                }
-                acc[prompt.goalUID].push(prompt);
                 return acc;
             }, {});
 

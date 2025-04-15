@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"log"
 	"math/rand"
-	"regexp"
 	"time"
 
 	"github.com/llmang/llmango/openrouter"
@@ -75,38 +74,13 @@ func Run[I, R any](l *LLMangoManager, g *Goal[I, R], input *I) (*R, error) {
 		Parameters: selectedPrompt.Parameters,
 	}
 
-	//we need to add the json struct schme of the output and turn on the paramters for strucuttred json output
-	// ResponseFormatType *string `json:"response_format_type,omitempty
-
-	// For structured schema generation using the existing function from structured_responses.go
-	schemaDef, err := GenerateSchemaForType(g.ExampleOutput)
+	// Use the new helper function to create the JSON schema format
+	responseFormat, err := openrouter.UseOpenRouterJsonFormat(g.ExampleOutput, g.Title)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to create JSON schema format: %w", err)
 	}
 
-	// Convert the Definition to JSON for the schema
-	schemaBytes, err := json.Marshal(schemaDef)
-	if err != nil {
-		return nil, err
-	}
-
-	// Create a simplified response format structure with the JSON schema
-	responseFormat := map[string]interface{}{
-		"type": "json_schema",
-		"json_schema": map[string]interface{}{
-			"name":   regexp.MustCompile(`[^a-zA-Z0-9]+`).ReplaceAllString(g.Title, "_"),
-			"schema": json.RawMessage(schemaBytes),
-			"strict": true,
-		},
-	}
-
-	// Marshal the response format to JSON
-	bytes, err := json.Marshal(responseFormat)
-	if err != nil {
-		return nil, err
-	}
-
-	routerRequest.Parameters.ResponseFormat = bytes
+	routerRequest.Parameters.ResponseFormat = responseFormat
 
 	openrouterResponse, err := l.OpenRouter.GenerateNonStreamingChatResponse(routerRequest)
 
