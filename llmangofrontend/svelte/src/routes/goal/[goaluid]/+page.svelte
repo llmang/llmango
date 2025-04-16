@@ -30,6 +30,21 @@
     let modalPrompt = $state<Prompt | null>(null);
     let isViewMode = $state<boolean>(false);
     
+    // --- Simple Inline Edit State ---
+    let isEditing = $state(false);
+    let editableTitle = $state('');
+    let editableDescription = $state('');
+    let isSaving = $state(false);
+    let editError = $state<string | null>(null);
+
+    // Initialize editable fields when goal loads or changes (if not editing)
+    $effect(() => {
+        if (goal && !isEditing) {
+            editableTitle = goal.title;
+            editableDescription = goal.description;
+        }
+    });
+    
     // Load data on component mount
     onMount(async () => {
         loading = true;
@@ -56,6 +71,35 @@
         modalPrompt = null;
         isViewMode = false;
         promptModalOpen = true;
+    }
+
+    // --- Simple Save Function ---
+    async function saveGoalChanges() {
+        if (!goal || !goaluid || !editableTitle.trim()) {
+            editError = "Title cannot be empty.";
+            return;
+        }
+        isSaving = true;
+        editError = null;
+        try {
+            await llmangoAPI.updateGoal(goaluid, editableTitle.trim(), editableDescription.trim());
+            isEditing = false; // Exit edit mode on success
+        } catch (e) {
+            editError = e instanceof Error ? e.message : 'Failed to save changes';
+            console.error("Save failed:", e);
+        } finally {
+            isSaving = false;
+        }
+    }
+    
+    function cancelEdit() {
+        isEditing = false;
+        editError = null;
+        // Reset values from the potentially updated goal state
+        if (goal) {
+            editableTitle = goal.title;
+            editableDescription = goal.description;
+        }
     }
 </script>
 <style>
@@ -139,6 +183,52 @@
         color: #777;
         font-style: italic;
     }
+
+    /* Add minimal styles for editing */
+    .edit-container {
+        margin-bottom: 1rem;
+        position: relative;
+    }
+    .edit-actions {
+        margin-top: 0.5rem;
+        display: flex;
+        gap: 0.5rem;
+    }
+    .edit-actions button {
+        padding: 0.25rem 0.75rem;
+    }
+    .edit-error {
+        color: red;
+        font-size: 0.9em;
+        margin-top: 0.5rem;
+    }
+    .title-input, .desc-textarea {
+        width: 100%;
+        padding: 0.5rem;
+        border: 1px solid #ccc;
+        border-radius: 4px;
+        margin-bottom: 0.5rem;
+    }
+    .title-input {
+        font-size: 1.75rem;
+        font-weight: 500;
+    }
+    .desc-textarea {
+        min-height: 60px; /* Basic height */
+        resize: vertical; /* Allow vertical resize */
+        font-family: inherit; /* Match surrounding text */
+        line-height: 1.5;
+    }
+    /* Slightly adjust header alignment */
+    .page-header {
+        position: relative;
+    }
+    .edit-button {
+        position: absolute;
+        top: 0;
+        right: 0;
+        padding: 0.25rem 0.5rem;
+    }
 </style> 
 <div class="goal-page">
     {#if loading}
@@ -150,10 +240,41 @@
             <a href="{base}/goal">Back to Goals</a>
         </div>
     {:else}
-        <div class="page-header">
-            <h1>{goal?.title}</h1>
-            <p class="description">{goal?.description}</p>
+        <div class="edit-container">
+            {#if isEditing}
+                <div>
+                    <input 
+                        type="text" 
+                        bind:value={editableTitle} 
+                        class="title-input"
+                        placeholder="Goal Title"
+                        disabled={isSaving}
+                    />
+                    <textarea 
+                        bind:value={editableDescription} 
+                        class="desc-textarea"
+                        placeholder="Goal Description"
+                        disabled={isSaving}
+                    ></textarea>
+                    <div class="edit-actions">
+                        <button onclick={saveGoalChanges} disabled={isSaving || !editableTitle.trim()} class="btn btn-success btn-sm">
+                            {isSaving ? 'Saving...' : 'Save'}
+                        </button>
+                        <button onclick={cancelEdit} disabled={isSaving} class="btn btn-secondary btn-sm">Cancel</button>
+                    </div>
+                    {#if editError}
+                        <p class="edit-error">Error: {editError}</p>
+                    {/if}
+                </div>
+            {:else}
+                <div class="page-header">
+                    <h1>{goal?.title}</h1>
+                    <p class="description">{goal?.description}</p>
+                    <button onclick={() => { isEditing = true; editError = null; }} class="btn btn-outline-secondary btn-sm edit-button">Edit</button>
+                </div>
+            {/if}
         </div>
+
         <div class="spend-data">
             Total Spend: ${spendResponse?.spend?.toFixed(3)} ({spendResponse?.count} runs)
         </div>

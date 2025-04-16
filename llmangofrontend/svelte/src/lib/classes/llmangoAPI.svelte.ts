@@ -132,19 +132,30 @@ class LLMangoAPI{
     }
 
 
-    updateGoal = async (goalUID: string, goal: Partial<Goal>): Promise<void> => {
+    updateGoal = async (goalUID: string, title: string, description: string): Promise<void> => {
         const url = `${this.baseUrl}/goal/${goalUID}/update`;
+        const updateData = { title, description }; // Send only title and description
+        
         const response = await fetch(url, {
             method: 'POST',
-            body: JSON.stringify(goal)
+            headers: { // Ensure correct content type
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(updateData)
         });
         
         if (!response.ok) {
             throw new Error(`Failed to update goal: ${response.statusText}`);
         }
         
+        // Update local state optimistically or after confirmation
         if (this.goals[goalUID]) {
-            this.goals[goalUID] = Object.assign({}, this.goals[goalUID], goal);
+            // Create a new object to trigger reactivity
+            this.goals[goalUID] = { 
+                ...this.goals[goalUID], 
+                title: title, 
+                description: description 
+            };
         }
     }
 

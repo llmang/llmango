@@ -139,3 +139,51 @@ func (m *LLMangoManager) AddPromptToGoal(goalUID, promptUID string) error {
 
 	return nil
 }
+
+// UpdateGoalTitleDescription updates the Title and Description fields of a goal using reflection.
+// The goal parameter must be a pointer to a struct or an addressable struct value.
+func UpdateGoalTitleDescription(goal any, title, description string) error {
+	val := reflect.ValueOf(goal)
+
+	// Ensure goal is a pointer to a struct
+	if val.Kind() != reflect.Ptr {
+		return fmt.Errorf("goal must be a pointer to a struct, got %s", val.Kind())
+	}
+	val = val.Elem() // Dereference the pointer to get the struct value
+
+	// Ensure we are dealing with a struct
+	if val.Kind() != reflect.Struct {
+		// This should technically not happen if the input is pointer-to-struct, but good practice
+		return fmt.Errorf("goal element is not a struct, kind: %s", val.Kind())
+	}
+
+	// Get the Title field
+	titleField := val.FieldByName("Title")
+	if !titleField.IsValid() {
+		return fmt.Errorf("goal struct does not have a 'Title' field")
+	}
+	if !titleField.CanSet() {
+		return fmt.Errorf("'Title' field cannot be set (is it exported?)")
+	}
+	if titleField.Kind() != reflect.String {
+		return fmt.Errorf("'Title' field is not a string")
+	}
+
+	// Get the Description field
+	descField := val.FieldByName("Description")
+	if !descField.IsValid() {
+		return fmt.Errorf("goal struct does not have a 'Description' field")
+	}
+	if !descField.CanSet() {
+		return fmt.Errorf("'Description' field cannot be set (is it exported?)")
+	}
+	if descField.Kind() != reflect.String {
+		return fmt.Errorf("'Description' field is not a string")
+	}
+
+	// Set the values
+	titleField.SetString(title)
+	descField.SetString(description)
+
+	return nil
+}

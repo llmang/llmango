@@ -10,6 +10,7 @@ import (
 
 	"github.com/llmang/llmango/openrouter"
 )
+
 func Run[I, R any](l *LLMangoManager, g *Goal[I, R], input *I) (*R, error) {
 	// Record start time for request timing
 	requestStartTime := float64(time.Now().UnixNano()) / 1e9
