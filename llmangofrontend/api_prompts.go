@@ -3,6 +3,7 @@ package llmangofrontend
 import (
 	"encoding/json"
 	"fmt"
+	"log"
 	"net/http"
 	"net/url"
 	"sort"
@@ -122,40 +123,15 @@ func (r *APIRouter) handleCreatePrompt(w http.ResponseWriter, req *http.Request)
 	prompt.UID = strings.ReplaceAll(prompt.UID, " ", "_") // Replace spaces with underscores
 	prompt.UID = url.PathEscape(prompt.UID)
 
-	// // Handle parameters
-	// if prompt.Parameters != nil {
-	// 	if temperature, ok := prompt.Parameters["temperature"].(float64); ok {
-	// 		prompt.Parameters.Temperature = &temperature
-	// 	}
-	// 	if maxTokens, ok := prompt.Parameters["max_tokens"].(float64); ok {
-	// 		maxTokensInt := int(maxTokens)
-	// 		prompt.Parameters.MaxTokens = &maxTokensInt
-	// 	}
-	// 	if topP, ok := prompt.Parameters["top_p"].(float64); ok {
-	// 		prompt.Parameters.TopP = &topP
-	// 	}
-	// 	if frequencyPenalty, ok := prompt.Parameters["frequency_penalty"].(float64); ok {
-	// 		prompt.Parameters.FrequencyPenalty = &frequencyPenalty
-	// 	}
-	// 	if presencePenalty, ok := prompt.Parameters["presence_penalty"].(float64); ok {
-	// 		prompt.Parameters.PresencePenalty = &presencePenalty
-	// 	}
-	// }
-
-	// if len(prompt.Messages) > 0 {
-	// 	prompt.Messages = make([]openrouter.Message, len(prompt.Messages))
-	// 	for i, msgData := range prompt.Messages {
-	// 		if err := json.Unmarshal(msgData, &prompt.Messages[i]); err != nil {
-	// 			BadRequest(w, "Invalid message format")
-	// 			return
-	// 		}
-	// 	}
-	// }
-
 	// Add prompt to the map
 	r.Prompts[prompt.UID] = prompt
 
-	// Save state after creating the prompt
+	// Add the prompt UID to the corresponding goal's PromptUIDs list
+	if err := r.AddPromptToGoal(prompt.GoalUID, prompt.UID); err != nil {
+		log.Printf("Error adding prompt %s to goal %s: %v", prompt.UID, prompt.GoalUID, err)
+	}
+
+	// Save state after creating the prompt and updating the goal
 	if r.SaveState != nil {
 		if err := r.SaveState(); err != nil {
 			ServerError(w, err)

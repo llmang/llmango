@@ -2,6 +2,7 @@ package llmango
 
 import (
 	"fmt"
+	"reflect"
 	"time"
 
 	"github.com/llmang/llmango/openrouter"
@@ -75,4 +76,66 @@ type ResultError struct {
 
 func (re *ResultError) Error() string {
 	return fmt.Sprintf("Mango error occured: Reason:%v Message: %v", re.Reason, re.Message)
+}
+
+func (m *LLMangoManager) AddPromptToGoal(goalUID, promptUID string) error {
+	goalAny, ok := m.Goals[goalUID]
+	if !ok {
+		return fmt.Errorf("goal with UID '%s' not found", goalUID)
+	}
+
+	goalValue := reflect.ValueOf(goalAny)
+
+	// Check if goalAny is a pointer, if so, get the element it points to
+	if goalValue.Kind() == reflect.Ptr {
+		goalValue = goalValue.Elem()
+	}
+
+	// Ensure we are working with a struct
+	if goalValue.Kind() != reflect.Struct {
+		return fmt.Errorf("goal with UID '%s' is not a struct, but %v", goalUID, goalValue.Kind())
+	}
+
+	promptUIDsField := goalValue.FieldByName("PromptUIDs")
+	if !promptUIDsField.IsValid() {
+		return fmt.Errorf("goal struct for UID '%s' does not have a 'PromptUIDs' field", goalUID)
+	}
+
+	if promptUIDsField.Kind() != reflect.Slice {
+		return fmt.Errorf("'PromptUIDs' field for goal UID '%s' is not a slice, but %v", goalUID, promptUIDsField.Kind())
+	}
+
+	// Check if the slice element type is string
+	if promptUIDsField.Type().Elem().Kind() != reflect.String {
+		return fmt.Errorf("'PromptUIDs' field for goal UID '%s' is not a slice of strings, but slice of %v", goalUID, promptUIDsField.Type().Elem().Kind())
+	}
+
+	// Check if the field is addressable and settable
+	if !promptUIDsField.CanSet() {
+		// This might happen if goalAny was not a pointer originally.
+		// We need a pointer to modify the original struct in the map.
+		// Let's try getting a pointer to the value if it's addressable.
+		if goalValue.CanAddr() {
+			goalPtrValue := goalValue.Addr()
+			promptUIDsField = goalPtrValue.Elem().FieldByName("PromptUIDs") // Re-fetch the field from the addressable struct
+			if !promptUIDsField.CanSet() {
+				return fmt.Errorf("cannot set 'PromptUIDs' field for goal UID '%s', ensure the goal in the map is a pointer or the map stores addressable structs", goalUID)
+			}
+		} else {
+			return fmt.Errorf("cannot set 'PromptUIDs' field for goal UID '%s', the goal value is not addressable", goalUID)
+		}
+	}
+
+	// Append the new promptUID
+	newPromptUIDs := reflect.Append(promptUIDsField, reflect.ValueOf(promptUID))
+	promptUIDsField.Set(newPromptUIDs)
+
+	// If the original value in the map was not a pointer, update the map with the modified struct
+	// This path is less likely if goals are typically stored as pointers.
+	// if reflect.ValueOf(goalAny).Kind() != reflect.Ptr && goalValue.CanAddr() {
+	// 	m.Goals[goalUID] = goalValue.Interface() // Update map with the modified struct value
+	// }
+	// No need to update the map explicitly if goalAny was already a pointer, as we modified the pointed-to struct.
+
+	return nil
 }
