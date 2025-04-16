@@ -11,18 +11,21 @@
         isOpen, 
         goalUID, // This is the goalUID string
         prompt = null, 
+        prefillData = null, // Add new prop for prefilling data
         onClose = () => {},
         onSave = null
     } = $props<{
         isOpen: boolean;
         goalUID: string; // goalUID
         prompt?: Prompt | null; // null for new prompt, Prompt object for editing
+        prefillData?: Prompt | null; // Optional data to prefill the form
         onClose: () => void;
         onSave?: ((prompt: Prompt) => void) | null;
     }>();
 
     // Determine if we're creating a new prompt or editing an existing one
-    const isNewPrompt = $derived(!prompt);
+    const isNewPrompt = $derived(!prompt || !!prefillData);
+    const initialData = $derived(prompt || prefillData);
     let goal = $derived(llmangoAPI.goals[prompt?.goalUID || goalUID] || null);
     
     // Form state
@@ -49,17 +52,27 @@
     let goalData = $state<Goal | null>(null);
     let goalLoading = $state(false);
 
-    // Initialize the form with existing prompt data if editing
+    // Initialize the form with existing prompt data if editing, or prefill data if provided
     $effect(() => {
-        if (prompt && formData.UID!=prompt.UID) {
-            formData = { ...prompt };
-            // Ensure we have at least one message
+        if (initialData) {
+            formData = { ...initialData };
+            if (prefillData) {
+                formData.UID = '';
+                formData.totalRuns = 0;
+            }
             if (!formData.messages || formData.messages.length === 0) {
                 formData.messages = [{ role: 'user', content: '' }];
             }
         } else {
-            // Set the goalUID from prop for new prompts
             formData.goalUID = goal.UID;
+            formData.UID = '';
+            formData.model = '';
+            formData.parameters = new PromptParameters();
+            formData.messages = [{ role: 'user', content: '' }];
+            formData.weight = 1;
+            formData.isCanary = false;
+            formData.maxRuns = 0;
+            formData.totalRuns = 0;
         }
     });
 
@@ -180,6 +193,7 @@
             onClose();
         } catch (e) {
             error = e instanceof Error ? e.message : 'An error occurred';
+            console.error("Form submission error:", e);
         } finally {
             isSubmitting = false;
         }
@@ -248,7 +262,7 @@
                     {#if uidError}
                         <small class="error-text">{uidError}</small>
                     {:else}
-                        <small>Unique identifier (URL-safe characters only)</small>
+                        <small>Unique identifier (URL-safe characters only){#if prefillData} - must be different from original{/if}</small>
                     {/if}
                 </div>
 

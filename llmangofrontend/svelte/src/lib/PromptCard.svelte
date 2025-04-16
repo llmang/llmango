@@ -15,6 +15,7 @@
     }>();
 
     let isModalOpen = $state(false);
+    let isCopyModalOpen = $state(false);
 
     onMount(()=>{
         if (!goal && prompt.goalUID && llmangoAPI?.goals[prompt.goalUID]){
@@ -112,6 +113,7 @@
         max-height: 6em;
         font-family: monospace;
         background-color: var(--color-bg-light);
+        white-space: pre-wrap;
         padding: 0.5rem;
         border-radius: 4px;
         margin: 0;
@@ -142,6 +144,28 @@
 
     .edit-button:hover {
         background-color: var(--color-primary-dark);
+    }
+
+    .copy-button {
+        background: none;
+        border: none;
+        cursor: pointer;
+        padding: 0.25em;
+        position: absolute;
+        bottom: 0.75rem;
+        left: 0.75rem;
+        opacity: 0.6;
+        transition: opacity 0.2s;
+    }
+
+    .copy-button:hover {
+        opacity: 1;
+    }
+
+    .copy-button img {
+        width: 1.25rem;
+        height: 1.25rem;
+        vertical-align: middle;
     }
 </style>
 <Card 
@@ -188,7 +212,16 @@
             <span class="weight-badge">Weight: {prompt.weight}</span>
         </div>
     {#if editable}
-        <div class="edit-button-container">
+        <div class="actions-container">
+            <StopPropigation>
+                <button 
+                    class="copy-button" 
+                    onclick={() => isCopyModalOpen = true}
+                    title="Copy Prompt"
+                >
+                    <img src="https://public.llmang.com/icons/edit-copy.svg" alt="Copy" />
+                </button>
+            </StopPropigation>
             <StopPropigation>
                 <button class="edit-button" onclick={() => isModalOpen = true}>
                     Edit
@@ -208,6 +241,18 @@
         onSave={(updatedPrompt) => {
             prompt = updatedPrompt;
             isModalOpen = false;
+        }}
+    />
+{/if}
+
+{#if isCopyModalOpen}
+    <PromptModal 
+        isOpen={isCopyModalOpen}
+        goalUID={prompt.goalUID}
+        prefillData={prompt}
+        onClose={() => isCopyModalOpen = false}
+        onSave={(newPrompt) => {
+            isCopyModalOpen = false;
         }}
     />
 {/if}
