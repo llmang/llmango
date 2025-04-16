@@ -17,7 +17,6 @@ type LogFilter struct {
 	PerPage   int    `json:"perPage"`
 }
 
-
 // PaginationResponse represents pagination information for API responses
 type PaginationResponse struct {
 	Total      int `json:"total"`
@@ -30,6 +29,11 @@ type PaginationResponse struct {
 type LogResponse struct {
 	Logs       []llmango.LLMangoLog `json:"logs"`
 	Pagination PaginationResponse   `json:"pagination"`
+}
+
+type SpendResponse struct {
+	Spend float64 `json:"spend"`
+	Count int     `json:"count"`
 }
 
 // handleGetLogs handles general log queries with filters
@@ -98,6 +102,46 @@ func (r *APIRouter) handleGetLogs(w http.ResponseWriter, req *http.Request) {
 	json.NewEncoder(w).Encode(response)
 }
 
+// get the spend for a prompt or goal
+func (r *APIRouter) handleGetSpend(w http.ResponseWriter, req *http.Request) {
+	// Check if logging is enabled
+	if r.Logging == nil || r.Logging.GetLogs == nil {
+		w.WriteHeader(http.StatusServiceUnavailable)
+		json.NewEncoder(w).Encode("Logging is not enabled in this LLMango implementation")
+		return
+	}
+
+	// Parse request body
+	var filter *llmango.LLmangoLogFilter
+
+	if err := json.NewDecoder(req.Body).Decode(&filter); err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode("Invalid request body: " + err.Error())
+		return
+	}
+
+	filter.Limit = 0
+	filter.Offset = 0
+	// Get logs
+	logs, total, err := r.Logging.GetLogs(filter)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(w).Encode("Failed to get logs: " + err.Error())
+		return
+	}
+	var totalSpend float64
+	for _, log := range logs {
+		totalSpend += log.Cost
+	}
+
+	response := SpendResponse{
+		Spend: totalSpend,
+		Count: total,
+	}
+
+	json.NewEncoder(w).Encode(response)
+}
+
 // handleGetGoalLogs handles log queries for a specific goal
 func (r *APIRouter) handleGetGoalLogs(w http.ResponseWriter, req *http.Request) {
 
@@ -133,6 +177,69 @@ func (r *APIRouter) handleGetGoalLogs(w http.ResponseWriter, req *http.Request) 
 		GoalUID: &goalUID,
 		Limit:   perPage,
 		Offset:  (page - 1) * perPage,
+	}
+
+	// Get logs
+	logs, total, err := r.Logging.GetLogs(filter)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(w).Encode("Failed to get logs: " + err.Error())
+		return
+	}
+
+	// Calculate pagination using the returned total count
+	totalPages := (total + perPage - 1) / perPage
+	if totalPages == 0 {
+		totalPages = 1
+	}
+
+	response := LogResponse{
+		Logs: logs,
+		Pagination: PaginationResponse{
+			Total:      total,
+			Page:       page,
+			PerPage:    perPage,
+			TotalPages: totalPages,
+		},
+	}
+
+	json.NewEncoder(w).Encode(response)
+}
+
+// handleGetPromptLogs handles log queries for a specific prompt
+func (r *APIRouter) handleGetPromptLogs(w http.ResponseWriter, req *http.Request) {
+	promptUID := req.PathValue("promptuid")
+	if promptUID == "" {
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode("Missing prompt ID")
+		return
+	}
+
+	// Check if logging is enabled
+	if r.Logging == nil || r.Logging.GetLogs == nil {
+		w.WriteHeader(http.StatusServiceUnavailable)
+		json.NewEncoder(w).Encode("Logging is not enabled in this LLMango implementation")
+		return
+	}
+
+	// Parse pagination parameters
+	page := 1
+	perPage := 10
+	if pageStr := req.URL.Query().Get("page"); pageStr != "" {
+		if p, err := strconv.Atoi(pageStr); err == nil && p > 0 {
+			page = p
+		}
+	}
+	if perPageStr := req.URL.Query().Get("perPage"); perPageStr != "" {
+		if p, err := strconv.Atoi(perPageStr); err == nil && p > 0 {
+			perPage = p
+		}
+	}
+
+	filter := &llmango.LLmangoLogFilter{
+		PromptUID: &promptUID,
+		Limit:     perPage,
+		Offset:    (page - 1) * perPage,
 	}
 
 	// Get logs

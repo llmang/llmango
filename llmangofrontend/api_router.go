@@ -32,6 +32,7 @@ func (router *Router) CreateAPIRouter() *http.ServeMux {
 
 	// Logging endpoints
 	apiMux.HandleFunc("POST /logs", r.handleGetLogs)
+	apiMux.HandleFunc("POST /logs/spend", r.handleGetSpend)
 	apiMux.HandleFunc("POST /logs/goal/{goaluid}", r.handleGetGoalLogs)
 	apiMux.HandleFunc("POST /logs/prompt/{promptuid}", r.handleGetPromptLogs)
 

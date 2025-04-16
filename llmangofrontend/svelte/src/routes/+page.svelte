@@ -60,7 +60,7 @@
                 <a href={`${base}/goal`}>View All</a>
             </div>
             <div class="card-container">
-                {#if Object.keys(llmangoAPI).length > 0}
+                {#if Object.keys(llmangoAPI.goals).length > 0}
                     {#each Object.entries(llmangoAPI.goals).slice(0, 2) as [id, goal]}
                         {#if goal}
                             <GoalCard {goal} />

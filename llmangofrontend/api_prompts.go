@@ -4,8 +4,10 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"net/url"
 	"sort"
 	"strconv"
+	"strings"
 
 	"github.com/llmang/llmango/llmango"
 	"github.com/llmang/llmango/openrouter"
@@ -57,69 +59,6 @@ func (r *APIRouter) handleGetPrompt(w http.ResponseWriter, req *http.Request) {
 	json.NewEncoder(w).Encode(prompt)
 }
 
-// handleGetPromptLogs handles log queries for a specific prompt
-func (r *APIRouter) handleGetPromptLogs(w http.ResponseWriter, req *http.Request) {
-	promptUID := req.PathValue("promptuid")
-	if promptUID == "" {
-		w.WriteHeader(http.StatusBadRequest)
-		json.NewEncoder(w).Encode("Missing prompt ID")
-		return
-	}
-
-	// Check if logging is enabled
-	if r.Logging == nil || r.Logging.GetLogs == nil {
-		w.WriteHeader(http.StatusServiceUnavailable)
-		json.NewEncoder(w).Encode("Logging is not enabled in this LLMango implementation")
-		return
-	}
-
-	// Parse pagination parameters
-	page := 1
-	perPage := 10
-	if pageStr := req.URL.Query().Get("page"); pageStr != "" {
-		if p, err := strconv.Atoi(pageStr); err == nil && p > 0 {
-			page = p
-		}
-	}
-	if perPageStr := req.URL.Query().Get("perPage"); perPageStr != "" {
-		if p, err := strconv.Atoi(perPageStr); err == nil && p > 0 {
-			perPage = p
-		}
-	}
-
-	filter := &llmango.LLmangoLogFilter{
-		PromptUID: &promptUID,
-		Limit:     perPage,
-		Offset:    (page - 1) * perPage,
-	}
-
-	// Get logs
-	logs, total, err := r.Logging.GetLogs(filter)
-	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		json.NewEncoder(w).Encode("Failed to get logs: " + err.Error())
-		return
-	}
-
-	// Calculate pagination using the returned total count
-	totalPages := (total + perPage - 1) / perPage
-	if totalPages == 0 {
-		totalPages = 1
-	}
-
-	response := LogResponse{
-		Logs: logs,
-		Pagination: PaginationResponse{
-			Total:      total,
-			Page:       page,
-			PerPage:    perPage,
-			TotalPages: totalPages,
-		},
-	}
-
-	json.NewEncoder(w).Encode(response)
-}
-
 // handleDeletePrompt handles the deletion of a prompt
 func (r *APIRouter) handleDeletePrompt(w http.ResponseWriter, req *http.Request) {
 	var deleteReq struct {
@@ -168,64 +107,53 @@ func (r *APIRouter) handleDeletePrompt(w http.ResponseWriter, req *http.Request)
 // handleCreatePrompt creates a new prompt
 func (r *APIRouter) handleCreatePrompt(w http.ResponseWriter, req *http.Request) {
 	// Parse request body
-	var createReq struct {
-		UID        string            `json:"uid"`
-		Model      string            `json:"model"`
-		Parameters map[string]any    `json:"parameters"`
-		Messages   []json.RawMessage `json:"messages"`
-	}
+	var prompt *llmango.Prompt
 
-	if err := json.NewDecoder(req.Body).Decode(&createReq); err != nil {
+	if err := json.NewDecoder(req.Body).Decode(&prompt); err != nil {
 		BadRequest(w, "Invalid request body")
 		return
 	}
-
-	// Create prompt ID
-	promptUID := generateUID()
-	if createReq.UID != "" {
-		promptUID = createReq.UID
+	if prompt.UID == "" {
+		prompt.UID = generateUID()
 	}
 
-	// Create prompt
-	prompt := &llmango.Prompt{
-		UID:        promptUID,
-		Model:      createReq.Model,
-		Parameters: openrouter.Parameters{},
-		Messages:   []openrouter.Message{},
-	}
+	// Sanitize UID to be URL-safe and readable
+	prompt.UID = strings.TrimSpace(prompt.UID)
+	prompt.UID = strings.ReplaceAll(prompt.UID, " ", "_") // Replace spaces with underscores
+	prompt.UID = url.PathEscape(prompt.UID)
 
-	// Handle parameters
-	if createReq.Parameters != nil {
-		if temperature, ok := createReq.Parameters["temperature"].(float64); ok {
-			prompt.Parameters.Temperature = &temperature
-		}
-		if maxTokens, ok := createReq.Parameters["max_tokens"].(float64); ok {
-			maxTokensInt := int(maxTokens)
-			prompt.Parameters.MaxTokens = &maxTokensInt
-		}
-		if topP, ok := createReq.Parameters["top_p"].(float64); ok {
-			prompt.Parameters.TopP = &topP
-		}
-		if frequencyPenalty, ok := createReq.Parameters["frequency_penalty"].(float64); ok {
-			prompt.Parameters.FrequencyPenalty = &frequencyPenalty
-		}
-		if presencePenalty, ok := createReq.Parameters["presence_penalty"].(float64); ok {
-			prompt.Parameters.PresencePenalty = &presencePenalty
-		}
-	}
+	// // Handle parameters
+	// if prompt.Parameters != nil {
+	// 	if temperature, ok := prompt.Parameters["temperature"].(float64); ok {
+	// 		prompt.Parameters.Temperature = &temperature
+	// 	}
+	// 	if maxTokens, ok := prompt.Parameters["max_tokens"].(float64); ok {
+	// 		maxTokensInt := int(maxTokens)
+	// 		prompt.Parameters.MaxTokens = &maxTokensInt
+	// 	}
+	// 	if topP, ok := prompt.Parameters["top_p"].(float64); ok {
+	// 		prompt.Parameters.TopP = &topP
+	// 	}
+	// 	if frequencyPenalty, ok := prompt.Parameters["frequency_penalty"].(float64); ok {
+	// 		prompt.Parameters.FrequencyPenalty = &frequencyPenalty
+	// 	}
+	// 	if presencePenalty, ok := prompt.Parameters["presence_penalty"].(float64); ok {
+	// 		prompt.Parameters.PresencePenalty = &presencePenalty
+	// 	}
+	// }
 
-	if len(createReq.Messages) > 0 {
-		prompt.Messages = make([]openrouter.Message, len(createReq.Messages))
-		for i, msgData := range createReq.Messages {
-			if err := json.Unmarshal(msgData, &prompt.Messages[i]); err != nil {
-				BadRequest(w, "Invalid message format")
-				return
-			}
-		}
-	}
+	// if len(prompt.Messages) > 0 {
+	// 	prompt.Messages = make([]openrouter.Message, len(prompt.Messages))
+	// 	for i, msgData := range prompt.Messages {
+	// 		if err := json.Unmarshal(msgData, &prompt.Messages[i]); err != nil {
+	// 			BadRequest(w, "Invalid message format")
+	// 			return
+	// 		}
+	// 	}
+	// }
 
 	// Add prompt to the map
-	r.Prompts[promptUID] = prompt
+	r.Prompts[prompt.UID] = prompt
 
 	// Save state after creating the prompt
 	if r.SaveState != nil {
@@ -236,7 +164,7 @@ func (r *APIRouter) handleCreatePrompt(w http.ResponseWriter, req *http.Request)
 	}
 
 	json.NewEncoder(w).Encode(map[string]string{
-		"promptUID": promptUID,
+		"promptUID": prompt.UID,
 	})
 }
 

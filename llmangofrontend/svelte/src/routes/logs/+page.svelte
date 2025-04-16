@@ -52,7 +52,7 @@
     
     // Navigate pages
     function prevPage() {
-        filter.offset = paginationResponse.page-1 * filter.limit;
+        filter.offset = (paginationResponse.page - 2) * filter.limit;
     }
     
     function nextPage() {

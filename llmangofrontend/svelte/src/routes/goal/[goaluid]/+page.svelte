@@ -8,7 +8,7 @@
     import { llmangoAPI } from '$lib/classes/llmangoAPI.svelte';
     import { onMount } from 'svelte';
     import { page } from '$app/state';
-    import { llmangoLogging, type Log } from '$lib/classes/llmangoLogging.svelte';
+    import { llmangoLogging, type Log, type SpendResponse } from '$lib/classes/llmangoLogging.svelte';
     import LogTable from '$lib/LogTable.svelte';
     import PromptModal from '$lib/PromptModal.svelte';
     import { base } from '$app/paths';
@@ -19,9 +19,11 @@
     // Initial states with safe defaults
     let goal = $derived<Goal | undefined>(llmangoAPI?.goals?.[goaluid]);
     let prompts = $derived<Prompt[] | null>(llmangoAPI?.promptsByGoalUID?.[goaluid] || null);
+
     let loading = $state<boolean>(true);
     let error = $state<string | null>(null);
     let logs = $state<Log[]>([]);  // Initialize as empty array
+    let spendResponse = $state<SpendResponse | null >(null)
     let logsLoading = $state<boolean>(false);
     // Modal state
     let promptModalOpen = $state<boolean>(false);
@@ -40,6 +42,7 @@
                 offset: 0
             });
             logs = logsResponse?.logs 
+            spendResponse = await llmangoLogging.getSpend({goalUID:goaluid})
         } catch (e) {
             error = e instanceof Error ? e.message : 'Failed to load data';
         }finally{
@@ -55,91 +58,6 @@
         promptModalOpen = true;
     }
 </script>
-
-<div class="goal-page">
-    {#if loading}
-        <div class="loading">Loading goal data...</div>
-    {:else if error}
-        <div class="error">
-            <h2>Error</h2>
-            <p>{error}</p>
-            <a href="{base}/goal">Back to Goals</a>
-        </div>
-    {:else}
-        <div class="page-header">
-            <h1>{goal?.title}</h1>
-            <p class="description">{goal?.description}</p>
-        </div>
-
-        <div class="meta-info">
-            <div class="meta-item">
-                <strong>Goal ID:</strong> {goal?.UID}
-            </div>
-            <div class="meta-item">
-                <strong>Prompts:</strong> {prompts?.length}
-            </div>
-        </div>
-
-        <h2>Example</h2>
-        <div class="examples">
-            <div class="example-panel">
-                <div class="item-title">Input</div>
-                <pre>{JSON.stringify(goal?.exampleInput, null, 2)}</pre>
-            </div>
-            <div class="example-panel">
-                <div class="item-title">Output</div>
-                <pre>{JSON.stringify(goal?.exampleOutput, null, 2)}</pre>
-            </div>
-        </div>
-
-        <h2>Prompts</h2>
-        {#if !prompts || prompts.length === 0}
-            <div class="empty-state">
-                <p>No prompts found for this goal.</p>
-                <button class="btn btn-primary" onclick={openCreatePromptModal}>Create First Prompt</button>
-            </div>
-        {:else}
-            <div class="card-container">
-                <button onclick={openCreatePromptModal} class="card new-item-card">
-                    <div>+</div>
-                    <div>Create New Prompt</div>
-                </button>
-                {#each prompts as prompt}
-                    <div class="prompt-card-wrapper">
-                        <PromptCard {prompt} editable={true} />
-                    </div>
-                {/each}
-            </div>
-        {/if}
-        
-        <!-- Logs Section -->
-        <div class="item-title">Recent Logs</div>
-        {#if logsLoading}
-            <div class="loading">Loading logs...</div>
-        {:else if logs && logs.length > 0}
-            <LogTable logs={logs || []} />
-        {:else}
-            <div class="no-items">No logs found for this goal</div>
-        {/if}
-        
-        <!-- Debug Info -->
-        <details class="goal-debug">
-            <summary>Debug Info</summary>
-            <FormatJson jsonText={JSON.stringify(goal)} />
-        </details>
-    {/if}
-</div>
-
-<!-- Prompt Modal -->
-{#if goal}
-    <PromptModal 
-        isOpen={promptModalOpen}
-        goalUID={goaluid}
-        prompt={modalPrompt}
-        onClose={() => promptModalOpen = false}
-    />
-{/if}
-
 <style>
     .prompt-card-wrapper{
         position:relative;
@@ -222,3 +140,90 @@
         font-style: italic;
     }
 </style> 
+<div class="goal-page">
+    {#if loading}
+        <div class="loading">Loading goal data...</div>
+    {:else if error}
+        <div class="error">
+            <h2>Error</h2>
+            <p>{error}</p>
+            <a href="{base}/goal">Back to Goals</a>
+        </div>
+    {:else}
+        <div class="page-header">
+            <h1>{goal?.title}</h1>
+            <p class="description">{goal?.description}</p>
+        </div>
+        <div class="spend-data">
+            Total Spend: ${spendResponse?.spend?.toFixed(3)} ({spendResponse?.count} runs)
+        </div>
+
+        <div class="meta-info">
+            <div class="meta-item">
+                <strong>Goal ID:</strong> {goal?.UID}
+            </div>
+            <div class="meta-item">
+                <strong>Prompts:</strong> {prompts?.length}
+            </div>
+        </div>
+
+        <h2>Example</h2>
+        <div class="examples">
+            <div class="example-panel">
+                <div class="item-title">Input</div>
+                <pre>{JSON.stringify(goal?.exampleInput, null, 2)}</pre>
+            </div>
+            <div class="example-panel">
+                <div class="item-title">Output</div>
+                <pre>{JSON.stringify(goal?.exampleOutput, null, 2)}</pre>
+            </div>
+        </div>
+
+        <h2>Prompts</h2>
+        {#if !prompts || prompts.length === 0}
+            <div class="empty-state">
+                <p>No prompts found for this goal.</p>
+                <button class="btn btn-primary" onclick={openCreatePromptModal}>Create First Prompt</button>
+            </div>
+        {:else}
+            <div class="card-container">
+                <button onclick={openCreatePromptModal} class="card new-item-card">
+                    <div>+</div>
+                    <div>Create New Prompt</div>
+                </button>
+                {#each prompts as prompt}
+                    <div class="prompt-card-wrapper">
+                        <PromptCard {prompt} editable={true} />
+                    </div>
+                {/each}
+            </div>
+        {/if}
+        
+        <!-- Logs Section -->
+        <div class="item-title">Recent Logs</div>
+        {#if logsLoading}
+            <div class="loading">Loading logs...</div>
+        {:else if logs && logs.length > 0}
+            <LogTable logs={logs || []} />
+        {:else}
+            <div class="no-items">No logs found for this goal</div>
+        {/if}
+        
+        <!-- Debug Info -->
+        <details class="goal-debug">
+            <summary>Debug Info</summary>
+            <FormatJson jsonText={JSON.stringify(goal)} />
+        </details>
+    {/if}
+</div>
+
+<!-- Prompt Modal -->
+{#if goal}
+    <PromptModal 
+        isOpen={promptModalOpen}
+        goalUID={goaluid}
+        prompt={modalPrompt}
+        onClose={() => promptModalOpen = false}
+    />
+{/if}
+

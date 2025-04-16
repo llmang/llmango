@@ -11,6 +11,12 @@ export type LogFilter = {
     offset: number;
 }
 
+// Spend response from API
+export type SpendResponse = {
+    spend: number;
+    count: number;
+}
+
 export type Log = {
     timestamp: number;
     goalUID: string;
@@ -107,6 +113,14 @@ class LLMangoLogging {
         return this.fetch<LogResponse>(`/logs/prompt/${promptUID}`, {
             method: 'POST',
             body: JSON.stringify(filter)
+        });
+    }
+
+    // Get spending data with optional filters
+    getSpend = async (filter?: Partial<LogFilter>): Promise<SpendResponse> => {
+        return this.fetch<SpendResponse>('/logs/spend', {
+            method: 'POST',
+            body: JSON.stringify(filter || {})
         });
     }
 }

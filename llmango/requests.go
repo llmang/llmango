@@ -10,7 +10,6 @@ import (
 
 	"github.com/llmang/llmango/openrouter"
 )
-
 func Run[I, R any](l *LLMangoManager, g *Goal[I, R], input *I) (*R, error) {
 	// Record start time for request timing
 	requestStartTime := float64(time.Now().UnixNano()) / 1e9
@@ -18,11 +17,15 @@ func Run[I, R any](l *LLMangoManager, g *Goal[I, R], input *I) (*R, error) {
 	validPrompts := make(map[string]*Prompt)
 	totalWeight := 0
 
+	log.Printf("Goal %s has %d prompts", g.UID, len(g.PromptUIDs))
+
 	for _, promptUID := range g.PromptUIDs {
 		prompt, exists := l.Prompts[promptUID]
 		if !exists {
 			continue
 		}
+
+		log.Printf("Prompt UID: %s, Weight: %d, IsCanary: %t", prompt.UID, prompt.Weight, prompt.IsCanary)
 
 		if prompt.Weight > 0 {
 			if prompt.IsCanary {

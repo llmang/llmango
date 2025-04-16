@@ -21,7 +21,7 @@
             <div class="log-cell">Actions</div>
         </div>
         
-        {#each logs as log (log.timestamp)}
+        {#each logs as log}
             <LogComponent {log} />
         {/each}
         
