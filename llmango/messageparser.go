@@ -49,8 +49,11 @@ func ParseMessageIfStatements(input any, messages []openrouter.Message) ([]openr
 		inputMap[tag] = value.Interface()
 	}
 
-	// Regex pattern to match {{#if varName}}...{{/if}} blocks
-	ifPattern := regexp.MustCompile(`\{\{#if\s+([^{}]+)\}\}([\s\S]*?)\{\{\/if\}\}`)
+	// Regex pattern to match {{#if varName}}...({{:else}}...)?{{/if}} blocks
+	// Group 1: Variable name
+	// Group 2: Content if true
+	// Group 3: Content if false (else block) - may be empty if no else
+	ifPattern := regexp.MustCompile(`\{\{#if\s+([^{}]+)\}\}([\s\S]*?)(?:\{\{:else\}\}([\s\S]*?))?\{\{\/if\}\}`)
 
 	// Process each copied message
 	for i, msg := range copiedMessages {
@@ -58,38 +61,49 @@ func ParseMessageIfStatements(input any, messages []openrouter.Message) ([]openr
 		copiedMessages[i].Content = ifPattern.ReplaceAllStringFunc(msg.Content, func(match string) string {
 			// Extract variable name and block content
 			submatch := ifPattern.FindStringSubmatch(match)
-			if len(submatch) < 3 {
+			// Expected submatches:
+			// [0]: Full match
+			// [1]: Variable name
+			// [2]: Content if true
+			// [3]: Content if false (else block)
+			if len(submatch) < 4 { // Need at least 4 elements (full match + 3 groups)
 				return match // Return original if pattern doesn't match expected format
 			}
 
 			varName := strings.TrimSpace(submatch[1])
-			blockContent := submatch[2]
+			ifContent := submatch[2]
+			elseContent := submatch[3] // Will be empty if no {{:else}} was present
 
-			// Check if variable exists and is not empty
-			if val, ok := inputMap[varName]; ok {
-				// Check if value is empty string or nil
-				isEmpty := false
-				if val == nil {
-					isEmpty = true
-				} else {
-					switch v := val.(type) {
-					case string:
-						isEmpty = v == ""
-					case *string:
-						isEmpty = v == nil || *v == ""
-					default:
-						// For other types, consider them non-empty
-					}
-				}
-
-				if !isEmpty {
-					// Keep block content but remove the if tags
-					return blockContent
+			// Check if variable exists and is considered "truthy"
+			isTruthy := false
+			if val, ok := inputMap[varName]; ok && val != nil {
+				// Check specific types for emptiness
+				switch v := val.(type) {
+				case string:
+					isTruthy = v != ""
+				case *string:
+					isTruthy = v != nil && *v != ""
+				// Add other types if needed, e.g., slices, maps
+				// case []any:
+				// 	 isTruthy = len(v) > 0
+				// case map[any]any:
+				//  isTruthy = len(v) > 0
+				default:
+					// For non-nil types not explicitly checked (like numbers, bools),
+					// consider them truthy if they exist.
+					// Note: This treats 0 and false as truthy if the field exists.
+					// Adjust if different behavior is desired (e.g., check for zero values).
+					isTruthy = true
 				}
 			}
 
-			// Variable doesn't exist or is empty, remove entire block
-			return ""
+			if isTruthy {
+				// Keep the 'if' block content
+				return ifContent
+			} else {
+				// Keep the 'else' block content (which might be empty if no {{:else}})
+				return elseContent
+			}
 		})
 	}
 

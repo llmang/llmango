@@ -6,11 +6,14 @@
         goal?: Goal | null;
     }>();
 
-    // RegExp to match {{varname}} pattern (excluding if statements)
-    const variablePattern = /\{\{(?!#if|\/if)([^{}]+)\}\}/g;
+    // RegExp to match {{varname}} pattern (excluding if, /if, and :else)
+    const variablePattern = /\{\{(?!#if|\/if|:else)([^{}]+)\}\}/g;
     
-    // RegExp to match {{#if varname}}...{{/if}} pattern
-    const ifStatementPattern = /\{\{#if\s+([^{}]+)\}\}([\s\S]*?)\{\{\/if\}\}/g;
+    // RegExp to match {{#if varname}}...({{else}}...)?{{/if}} pattern
+    // Group 1: Variable name
+    // Group 2: Content if true
+    // Group 3: Content if false (else block) - may be empty if no else
+    const ifStatementPattern = /\{\{#if\s+([^{}]+)\}\}(.*?)(?:\{\{:else\}\}(.*?))?\{\{\/if\}\}/gs;
     
     // Track collapsed state of if blocks
     const collapsedBlocks = $state<Record<number, boolean>>({});
@@ -25,7 +28,8 @@
         type: 'ifBlock';
         id: number;
         condition: string;
-        content: string;
+        ifContent: string; // Renamed for clarity
+        elseContent?: string; // Optional else content
         colorClass: string;
         collapsed: boolean;
     };
@@ -78,19 +82,27 @@
                 });
             }
             
-            const [fullMatch, conditionVar, content] = match;
+            // fullMatch, conditionVar, ifContent, elseContent (optional)
+            const [fullMatch, conditionVar, ifContentRaw, elseContentRaw] = match;
             const isValid = isValidVariable(conditionVar);
             const colorClass = isValid ? 'valid-condition' : 'invalid-condition';
             const id = blockCounter++;
             
-            blocks.push({
+            const ifBlock: IfBlock = {
                 type: 'ifBlock',
                 id,
                 condition: conditionVar,
-                content: formatVariables(content),
+                ifContent: formatVariables(ifContentRaw), // Format variables within if content
                 colorClass,
                 collapsed: collapsedBlocks[id] || false
-            });
+            };
+            
+            // Add else content if it exists
+            if (elseContentRaw !== undefined) {
+                ifBlock.elseContent = formatVariables(elseContentRaw); // Format variables within else content
+            }
+            
+            blocks.push(ifBlock);
             
             lastIndex = match.index + fullMatch.length;
         }
@@ -136,17 +148,7 @@
             <span>{@html block.content}</span>
         {:else if block.type === 'ifBlock'}
             <div class="if-block">
-                <div class="if-header">
-                    <button class="toggle-arrow" onclick={() => toggleBlock(block.id)}>
-                        {block.collapsed ? '▶' : '▼'}
-                    </button>
-                    <span class="{block.colorClass}">&#123;&#123;#if {block.condition}&#125;&#125;</span>
-                </div
-                >{#if !block.collapsed}
-                    <div class="if-content">
-                        {@html block.content}
-                    </div>
-                {/if}<div class="{block.colorClass}">&#123;&#123;/if&#125;&#125;</div>
+                <div class="if-header"><button class="toggle-arrow" onclick={() => toggleBlock(block.id)}>{block.collapsed ? '▶' : '▼'}</button><span class="if-tag {block.colorClass}">&#123;&#123;#if {block.condition}&#125;&#125;</span></div>{#if !block.collapsed}<div class="if-content">{@html block.ifContent}</div>{/if}{#if block.elseContent !== undefined}<div class="else-header"><span class="else-tag">&#123;&#123;:else&#125;&#125;</span></div>{/if}{#if !block.collapsed && block.elseContent !== undefined}<div class="else-content">{@html block.elseContent}</div>{/if}<div class="if-footer"><span class="if-end-tag {block.colorClass}">&#123;&#123;/if&#125;&#125;</span></div>
             </div>
         {/if}
     {/each}
@@ -184,28 +186,45 @@
         border-radius: 3px;
     }
     
-    .valid-condition {
-        color: #6f42c1;
+    .if-tag,
+    .else-tag,
+    .if-end-tag {
         font-weight: bold;
-        background-color: rgba(111, 66, 193, 0.1);
-        padding: 2px 4px;
         border-radius: 3px;
         display: inline-block;
         width: 100%;
     }
+
+    .else-tag, .if-end-tag{
+    padding-left:1rem;
+    }
     
-    .invalid-condition {
+    .if-tag.valid-condition,
+    .if-end-tag.valid-condition {
+        color: #6f42c1;
+        background-color: rgba(111, 66, 193, 0.1);
+    }
+    
+    .if-tag.invalid-condition,
+    .if-end-tag.invalid-condition {
         color: #dc3545;
-        font-weight: bold;
         background-color: rgba(220, 53, 69, 0.1);
-        padding: 2px 4px;
-        border-radius: 3px;
-        display: inline-block;
+    }
+    
+    .else-tag {
+        color: #fd7e14;
+        background-color: rgba(253, 126, 20, 0.1);
     }
     
     .if-block {
-        margin: 2px 0;
-        border-left: 2px solid #6f42c1;
+        border-left: 2px solid rgba(111, 66, 193, 0.3);
+        padding-left: 0;
+    }
+
+    .if-content, .else-content{
+        margin-left:2rem;
+        margin-bottom:1rem;
+        max-width: 90%;
     }
     
     .if-header {
@@ -215,19 +234,16 @@
     
     .toggle-arrow {
         cursor: pointer;
-        margin-right: 4px;
-        background:
-rgba(128, 128, 128, 0.436);
-  border-radius:.5em;
-  aspect-ratio: 1/1;
-  height: 1.5em;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-
+        background: rgba(128, 128, 128, 0.2);
+        border: none;
+        border-radius: 0.3em;
+        width: 1.6em;
+        height: 1.6em;
+        line-height: 1.6em;
+        text-align: center;
+        padding: 0;
+        margin-right: 6px;
+        flex-shrink: 0;
     }
     
-    .if-content {
-        padding-left: 16px;
-    }
 </style> 

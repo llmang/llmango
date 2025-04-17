@@ -71,6 +71,74 @@ The following items have already been used: {{previousItems}}
 			message:  `Test {{#if }}Malformed{{/if}}`,
 			expected: `Test {{#if }}Malformed{{/if}}`,
 		},
+		{
+			name: "If true with else",
+			message: `Test {{#if nonEmptyString}}
+If Block
+{{:else}}
+Else Block
+{{/if}} End`,
+			expected: `Test 
+If Block
+ End`,
+		},
+		{
+			name: "If false (empty string) with else",
+			message: `Test {{#if emptyString}}
+If Block
+{{:else}}
+Else Block
+{{/if}} End`,
+			expected: `Test 
+Else Block
+ End`,
+		},
+		{
+			name: "If false (non-existent var) with else",
+			message: `Test {{#if nonExistentVar}}
+If Block
+{{:else}}
+Else Block
+{{/if}} End`,
+			expected: `Test 
+Else Block
+ End`,
+		},
+		{
+			name:     "If true without else",
+			message:  `Test {{#if nonEmptyString}}If Block{{/if}} End`,
+			expected: `Test If Block End`,
+		},
+		{
+			name:     "If false (empty string) without else",
+			message:  `Test {{#if emptyString}}If Block{{/if}} End`,
+			expected: `Test  End`, // Content removed, space remains
+		},
+		{
+			name:     "If false (non-existent var) without else",
+			message:  `Test {{#if nonExistentVar}}If Block{{/if}} End`,
+			expected: `Test  End`, // Content removed, space remains
+		},
+		{
+			name:     "Multiple if/else blocks",
+			message:  `{{#if name}}Name: {{name}}{{:else}}No Name{{/if}} {{#if emptyString}}Empty{{:else}}Not Empty{{/if}}`,
+			expected: `Name: {{name}} Not Empty`,
+		},
+		{
+			name:     "Malformed else (ignored)", // Current regex won't match this structure correctly, treated as no-else
+			message:  `Test {{#if emptyString}}If Block {{:else malformed}} Else Block{{/if}} End`,
+			expected: `Test  End`, // behaves as if no else block was present
+		},
+		{
+			name:     "Else outside if (ignored)",
+			message:  `Test {{:else}} Orphaned Else {{/if}} End`,
+			expected: `Test {{:else}} Orphaned Else {{/if}} End`,
+		},
+		{
+			name:     "Zero value treated as truthy",
+			message:  `Test {{#if zeroValue}}Zero If{{:else}}Zero Else{{/if}} End`,
+			expected: `Test Zero If End`,
+		},
 	}
 
 	for _, test := range tests {
@@ -214,6 +282,31 @@ Hello John!`,
 
 NonEmpty: value`,
 		},
+		{
+			name:     "If true with else and variables",
+			message:  `{{#if name}}Hello {{name}}{{:else}}No name provided{{/if}}. You are {{age}}.`,
+			expected: `Hello John. You are 30.`,
+		},
+		{
+			name:     "If false with else and variables",
+			message:  `{{#if emptyString}}Got empty: {{emptyString}}{{:else}}Not empty: {{nonEmptyString}}{{/if}}`,
+			expected: `Not empty: value`,
+		},
+		{
+			name:     "If false (non-existent) with else and variables",
+			message:  `{{#if nonExistent}}If: {{nonExistent}}{{:else}}Else: {{name}}{{/if}}`,
+			expected: `Else: John`,
+		},
+		{
+			name:     "Variable substitution only in kept block (if)",
+			message:  `{{#if name}}Name: {{name}}, Age: {{age}}{{:else}}Else with {{age}}{{/if}}`,
+			expected: `Name: John, Age: 30`,
+		},
+		{
+			name:     "Variable substitution only in kept block (else)",
+			message:  `{{#if emptyString}}If with {{name}}{{:else}}Else: {{nonEmptyString}}, Age: {{age}}{{/if}}`,
+			expected: `Else: value, Age: 30`,
+		},
 	}
 
 	for _, test := range tests {
@@ -355,6 +448,78 @@ Create a list of 5 conversation topics for daily activities, The scenarios will 
 
 Create a list of 5 conversation topics for daily activities, The scenarios will be for users set in the country where most speak Spanish BUT DO NOT GIVE SPECIFICS ABOUT THAT COUNTRY. give broad scenarios`
 
+		if result[0].Content != expected {
+			t.Errorf("Expected:\n%s\n\nGot:\n%s", expected, result[0].Content)
+		}
+	})
+}
+
+func TestComplexConditionalWithElseExample(t *testing.T) {
+	// Test data
+	inputWithItems := struct {
+		PreviousItems   string `json:"previousItems"`
+		Count           int    `json:"count"`
+		GeneralCategory string `json:"generalCategory"`
+		CourseLanguage  string `json:"courseLanguage"`
+	}{
+		PreviousItems:   "1. Item A\n2. Item B",
+		Count:           3,
+		GeneralCategory: "Test Category",
+		CourseLanguage:  "Klingon",
+	}
+	inputWithoutItems := struct {
+		PreviousItems   string `json:"previousItems"`
+		Count           int    `json:"count"`
+		GeneralCategory string `json:"generalCategory"`
+		CourseLanguage  string `json:"courseLanguage"`
+	}{
+		PreviousItems:   "", // Empty
+		Count:           3,
+		GeneralCategory: "Test Category",
+		CourseLanguage:  "Klingon",
+	}
+
+	// Modified prompt using if/else
+	promptWithElse := `Generate {{count}} topics for {{generalCategory}} (language: {{courseLanguage}}).
+{{#if previousItems}}
+Avoid these used topics:
+{{previousItems}}
+{{:else}}
+This is the first set of topics for this category.
+{{/if}}
+Ensure topics are unique.`
+
+	messages := []openrouter.Message{{Role: "user", Content: promptWithElse}}
+
+	// Test with previousItems (if block should be kept)
+	t.Run("With previousItems and else", func(t *testing.T) {
+		result, err := ParseMessages(inputWithItems, messages)
+		if err != nil {
+			t.Fatalf("ParseMessages returned error: %v", err)
+		}
+		expected := `Generate 3 topics for Test Category (language: Klingon).
+
+Avoid these used topics:
+1. Item A
+2. Item B
+
+Ensure topics are unique.`
+		if result[0].Content != expected {
+			t.Errorf("Expected:\n%s\n\nGot:\n%s", expected, result[0].Content)
+		}
+	})
+
+	// Test without previousItems (else block should be kept)
+	t.Run("Without previousItems and else", func(t *testing.T) {
+		result, err := ParseMessages(inputWithoutItems, messages)
+		if err != nil {
+			t.Fatalf("ParseMessages returned error: %v", err)
+		}
+		expected := `Generate 3 topics for Test Category (language: Klingon).
+
+This is the first set of topics for this category.
+
+Ensure topics are unique.`
 		if result[0].Content != expected {
 			t.Errorf("Expected:\n%s\n\nGot:\n%s", expected, result[0].Content)
 		}
