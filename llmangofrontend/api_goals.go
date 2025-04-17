@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"reflect"
+	"sort"
 	"strconv"
 
 	"github.com/llmang/llmango/llmango"
@@ -70,16 +72,73 @@ func (r *APIRouter) handleGetGoals(w http.ResponseWriter, req *http.Request) {
 		}
 	}
 
-	// Get all goals
-	goals := make(map[string]interface{})
-	for uid, goal := range r.Goals {
-		goals[uid] = goal
-		if limit > 0 && len(goals) >= limit {
-			break
-		}
+	// Get all goals and convert to a slice for sorting
+	// We need to use reflection to access GoalInfo fields from the map[string]any
+	goalsSlice := make([]any, 0, len(r.Goals))
+	for _, goal := range r.Goals {
+		goalsSlice = append(goalsSlice, goal)
 	}
 
-	json.NewEncoder(w).Encode(goals)
+	// Sort the goals slice using reflection
+	sort.Slice(goalsSlice, func(i, j int) bool {
+		goalI := goalsSlice[i]
+		goalJ := goalsSlice[j]
+
+		valI := reflect.ValueOf(goalI)
+		valJ := reflect.ValueOf(goalJ)
+
+		// Ensure they are pointers and get the element
+		if valI.Kind() == reflect.Ptr {
+			valI = valI.Elem()
+		}
+		if valJ.Kind() == reflect.Ptr {
+			valJ = valJ.Elem()
+		}
+
+		// Access GoalInfo struct (assuming it's the first embedded field or named GoalInfo)
+		// This assumes a consistent structure for Goal types
+		goalInfoIField := valI.FieldByName("GoalInfo")
+		goalInfoJField := valJ.FieldByName("GoalInfo")
+
+		// Fallback if GoalInfo field isn't found directly (might be embedded anonymously)
+		// This part is tricky and might need adjustment based on exact Goal struct definition
+		if !goalInfoIField.IsValid() || !goalInfoJField.IsValid() {
+			// Attempt to find embedded GoalInfo fields indirectly - this is less robust
+			// Or handle error/log warning
+			log.Printf("Warning: Could not find GoalInfo field directly for sorting goal. Check Goal struct definition.")
+			// As a basic fallback, sort by UID if possible, else keep original order
+			uidIField := valI.FieldByName("UID")
+			uidJField := valJ.FieldByName("UID")
+			if uidIField.IsValid() && uidJField.IsValid() && uidIField.Kind() == reflect.String && uidJField.Kind() == reflect.String {
+				return uidIField.String() < uidJField.String() // Basic UID sort if timestamps fail
+			}
+			return false // Keep original order if fields inaccessible
+		}
+
+		updatedAtI := goalInfoIField.FieldByName("UpdatedAt").Int()
+		updatedAtJ := goalInfoJField.FieldByName("UpdatedAt").Int()
+		if updatedAtI != updatedAtJ {
+			return updatedAtI > updatedAtJ // Descending UpdatedAt
+		}
+
+		createdAtI := goalInfoIField.FieldByName("CreatedAt").Int()
+		createdAtJ := goalInfoJField.FieldByName("CreatedAt").Int()
+		if createdAtI != createdAtJ {
+			return createdAtI > createdAtJ // Descending CreatedAt
+		}
+
+		titleI := goalInfoIField.FieldByName("Title").String()
+		titleJ := goalInfoJField.FieldByName("Title").String()
+		return titleI < titleJ // Ascending Title for ties
+	})
+
+	// Apply limit if specified
+	finalGoals := goalsSlice
+	if limit > 0 && limit < len(goalsSlice) {
+		finalGoals = goalsSlice[:limit]
+	}
+
+	json.NewEncoder(w).Encode(finalGoals)
 }
 
 // handleGetGoal handles getting a single goal by UID

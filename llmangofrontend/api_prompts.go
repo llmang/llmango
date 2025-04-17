@@ -29,9 +29,17 @@ func (r *APIRouter) handleGetPrompts(w http.ResponseWriter, req *http.Request) {
 		prompts = append(prompts, prompt)
 	}
 
-	// Sort prompts by UpdatedAt
+	// Sort prompts by UpdatedAt (desc), CreatedAt (desc), UID (asc)
 	sort.Slice(prompts, func(i, j int) bool {
-		return prompts[i].UpdatedAt > prompts[j].UpdatedAt
+		p1 := prompts[i]
+		p2 := prompts[j]
+		if p1.UpdatedAt != p2.UpdatedAt {
+			return p1.UpdatedAt > p2.UpdatedAt // Most recent UpdatedAt first
+		}
+		if p1.CreatedAt != p2.CreatedAt {
+			return p1.CreatedAt > p2.CreatedAt // Most recent CreatedAt first
+		}
+		return p1.UID < p2.UID // Alphabetical UID for ties
 	})
 
 	// Apply limit if specified
