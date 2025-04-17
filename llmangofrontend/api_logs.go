@@ -44,47 +44,41 @@ func (r *APIRouter) handleGetLogs(w http.ResponseWriter, req *http.Request) {
 		json.NewEncoder(w).Encode("Logging is not enabled in this LLMango implementation")
 		return
 	}
+	var filter llmango.LLmangoLogFilter
 
-	// Parse request body
-	var filterReq struct {
-		GoalUID    *string `json:"goalUID"`
-		PromptUID  *string `json:"promptUID"`
-		IncludeRaw bool    `json:"includeRaw"`
-		Limit      int     `json:"limit"`
-		Offset     int     `json:"offset"`
-	}
-
-	if err := json.NewDecoder(req.Body).Decode(&filterReq); err != nil {
+	if err := json.NewDecoder(req.Body).Decode(&filter); err != nil {
 		w.WriteHeader(http.StatusBadRequest)
-		json.NewEncoder(w).Encode("Invalid request body: " + err.Error())
+		json.NewEncoder(w).Encode("Invalid request body format: " + err.Error())
 		return
 	}
 
-	// Set defaults if not provided
-	if filterReq.Limit <= 0 {
-		filterReq.Limit = 10
+	defer req.Body.Close()
+
+	// --- Apply Defaults ---
+	defaultLimit := 10
+	if filter.Limit == nil || *filter.Limit <= 0 {
+		filter.Limit = &defaultLimit
 	}
 
-	// Convert our filter to llmango's filter type
-	filter := &llmango.LLmangoLogFilter{
-		GoalUID:    filterReq.GoalUID,
-		PromptUID:  filterReq.PromptUID,
-		IncludeRaw: filterReq.IncludeRaw,
-		Limit:      filterReq.Limit,
-		Offset:     filterReq.Offset,
+	defaultOffset := 0
+	if filter.Offset == nil || *filter.Offset < 0 {
+		filter.Offset = &defaultOffset
 	}
+	// --- End Apply Defaults ---
 
-	// Get logs
-	logs, total, err := r.Logging.GetLogs(filter)
+	// Get logs using the populated filter struct (passed by address)
+	logs, total, err := r.Logging.GetLogs(&filter)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		json.NewEncoder(w).Encode("Failed to get logs: " + err.Error())
 		return
 	}
 
-	// Calculate pagination
-	page := (filterReq.Offset / filterReq.Limit) + 1
-	totalPages := (total + filterReq.Limit - 1) / filterReq.Limit
+	// Calculate pagination using dereferenced pointers after ensuring they are not nil
+	limit := *filter.Limit   // Use the value after default is applied
+	offset := *filter.Offset // Use the value after default is applied
+	page := (offset / limit) + 1
+	totalPages := (total + limit - 1) / limit
 	if totalPages == 0 {
 		totalPages = 1
 	}
@@ -94,11 +88,12 @@ func (r *APIRouter) handleGetLogs(w http.ResponseWriter, req *http.Request) {
 		Pagination: PaginationResponse{
 			Total:      total,
 			Page:       page,
-			PerPage:    filterReq.Limit,
+			PerPage:    limit, // Use the effective limit
 			TotalPages: totalPages,
 		},
 	}
 
+	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(response)
 }
 
@@ -120,8 +115,11 @@ func (r *APIRouter) handleGetSpend(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	filter.Limit = 0
-	filter.Offset = 0
+	limit := 0
+	offset := 0
+	filter.Limit = &limit
+	filter.Offset = &offset
+
 	// Get logs
 	logs, total, err := r.Logging.GetLogs(filter)
 	if err != nil {
@@ -173,10 +171,12 @@ func (r *APIRouter) handleGetGoalLogs(w http.ResponseWriter, req *http.Request) 
 		}
 	}
 
+	limit := perPage
+	offset := (page - 1) * perPage
 	filter := &llmango.LLmangoLogFilter{
 		GoalUID: &goalUID,
-		Limit:   perPage,
-		Offset:  (page - 1) * perPage,
+		Limit:   &limit,
+		Offset:  &offset,
 	}
 
 	// Get logs
@@ -236,10 +236,12 @@ func (r *APIRouter) handleGetPromptLogs(w http.ResponseWriter, req *http.Request
 		}
 	}
 
+	limit := perPage
+	offset := (page - 1) * perPage
 	filter := &llmango.LLmangoLogFilter{
 		PromptUID: &promptUID,
-		Limit:     perPage,
-		Offset:    (page - 1) * perPage,
+		Limit:     &limit,
+		Offset:    &offset,
 	}
 
 	// Get logs

@@ -11,22 +11,21 @@ import (
 	"github.com/llmang/llmango/openrouter"
 )
 
-func Run[I, R any](l *LLMangoManager, g *Goal[I, R], input *I) (*R, error) {
-	// Record start time for request timing
+func Run[I, R any](l *LLMangoManager, g *Goal, input *I) (*R, error) {
 	requestStartTime := float64(time.Now().UnixNano()) / 1e9
 	var res R
 	validPrompts := make(map[string]*Prompt)
 	totalWeight := 0
 
-	log.Printf("Goal %s has %d prompts", g.UID, len(g.PromptUIDs))
-
 	for _, promptUID := range g.PromptUIDs {
-		prompt, exists := l.Prompts[promptUID]
-		if !exists {
+		if !l.Prompts.Exists(promptUID) {
+			log.Printf("WARN: prompt %s not found in manager, skipping.", promptUID)
 			continue
 		}
-
-		log.Printf("Prompt UID: %s, Weight: %d, IsCanary: %t", prompt.UID, prompt.Weight, prompt.IsCanary)
+		prompt := l.Prompts.Get(promptUID)
+		if prompt == nil {
+			continue
+		}
 
 		if prompt.Weight > 0 {
 			if prompt.IsCanary {
@@ -43,29 +42,47 @@ func Run[I, R any](l *LLMangoManager, g *Goal[I, R], input *I) (*R, error) {
 
 	var selectedPrompt *Prompt
 	if len(validPrompts) == 0 {
-		return nil, fmt.Errorf("there are no valid prompts for goal: %v \n Canaries may have finished and no base prompt is present.", g.UID)
+		hasBasePrompt := false
+		for _, pUID := range g.PromptUIDs {
+			if l.Prompts.Exists(pUID) {
+				p := l.Prompts.Get(pUID)
+				if p != nil && !p.IsCanary {
+					hasBasePrompt = true
+					break
+				}
+			}
+		}
+		if hasBasePrompt {
+			return nil, fmt.Errorf("no valid prompts available for goal %s", g.UID)
+		} else {
+			return nil, fmt.Errorf("no valid prompts available for goal %s and no base prompt exists or is loaded", g.UID)
+		}
 	}
 
 	randWeight := rand.Intn(totalWeight)
 	currentWeight := 0
 
-	for _, prompt := range validPrompts {
+	promptUIDs := make([]string, 0, len(validPrompts))
+	for uid := range validPrompts {
+		promptUIDs = append(promptUIDs, uid)
+	}
+
+	for _, uid := range promptUIDs {
+		prompt := validPrompts[uid]
 		currentWeight += prompt.Weight
 		if randWeight < currentWeight {
 			selectedPrompt = prompt
 			if selectedPrompt.IsCanary {
-				selectedPrompt.TotalRuns++ // Directly increment the reference
+				selectedPrompt.TotalRuns++
 			}
 			break
 		}
 	}
 
 	if selectedPrompt == nil {
-		return nil, errors.New("failed to select prompt after looping over prompts")
+		return nil, errors.New("failed to select prompt after weighted random selection")
 	}
 
-	//here we have to use a helper func to replace {{val}} with struct field vals
-	//we want to reflect the input vals into a map of string to val then loop over them and regex the prompt mesages for {{string}} where not /{{}} valid everything ofcourse
 	updatedMessages, err := ParseMessages(input, selectedPrompt.Messages)
 	if err != nil {
 		return nil, fmt.Errorf("failed to update prompt messages with err: %w", err)
@@ -78,8 +95,7 @@ func Run[I, R any](l *LLMangoManager, g *Goal[I, R], input *I) (*R, error) {
 		Parameters: selectedPrompt.Parameters,
 	}
 
-	// Use the new helper function to create the JSON schema format
-	responseFormat, err := openrouter.UseOpenRouterJsonFormat(g.ExampleOutput, g.Title)
+	responseFormat, err := openrouter.UseOpenRouterJsonFormat(g.InputOutput.OutputExample, g.Title)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create JSON schema format: %w", err)
 	}
@@ -88,61 +104,110 @@ func Run[I, R any](l *LLMangoManager, g *Goal[I, R], input *I) (*R, error) {
 
 	openrouterResponse, err := l.OpenRouter.GenerateNonStreamingChatResponse(routerRequest)
 
-	// Calculate request time elapsed so far
 	requestTimeElapsed := float64(time.Now().UnixNano())/1e9 - requestStartTime
 
-	//EXponEnTiALY BACKOFF RETRIES
-	if errors.Is(err, openrouter.ErrRateLimited) {
+	if l.RetryRateLimit && errors.Is(err, openrouter.ErrRateLimited) {
 		curDelay := BASE_BACKOFF_DELAY
-		for range MAX_BACKOFF_ATTEMPTS {
+		for i := range MAX_BACKOFF_ATTEMPTS {
+			log.Printf("Rate limited. Retrying in %v (Attempt %d/%d)", curDelay, i+1, MAX_BACKOFF_ATTEMPTS)
 			time.Sleep(curDelay)
+			requestTimeStartRetry := float64(time.Now().UnixNano()) / 1e9
 			openrouterResponse, err = l.OpenRouter.GenerateNonStreamingChatResponse(routerRequest)
+			requestTimeElapsed += float64(time.Now().UnixNano())/1e9 - requestTimeStartRetry
+
 			if err == nil || !errors.Is(err, openrouter.ErrRateLimited) {
 				break
 			}
-			curDelay = curDelay * 2
+			curDelay *= 2
 		}
-		if err != nil && errors.Is(err, openrouter.ErrRateLimited) {
-			err = ErrMaxRateLimitRetries
+
+		if errors.Is(err, openrouter.ErrRateLimited) {
+			log.Printf("Max rate limit retries reached for goal %s.", g.UID)
+			err = fmt.Errorf("%w: for goal %s", ErrMaxRateLimitRetries, g.UID)
 		}
 	}
 
-	if err != nil {
-		return nil, fmt.Errorf("error generating response from OpenRouter: %w", err)
+	logErr := err
+
+	if logErr != nil {
+		if l.Logging != nil && l.Logging.LogResponse != nil {
+			logEntry, createLogErr := l.createLogObject(g.UID, selectedPrompt.UID, input, routerRequest, openrouterResponse, nil, requestTimeElapsed, selectedPrompt.IsCanary, logErr)
+			if createLogErr != nil {
+				log.Printf("Failed to create log object after API error: %v (Original Error: %v)", createLogErr, logErr)
+			} else {
+				go func(mangoLog *LLMangoLog) {
+					if logErr := l.Logging.LogResponse(mangoLog); logErr != nil {
+						log.Printf("Failed to log API error response: %v", logErr)
+					}
+				}(logEntry)
+			}
+		}
+		return nil, fmt.Errorf("error generating response from OpenRouter for goal %s: %w", g.UID, logErr)
 	}
+
 	if openrouterResponse == nil {
-		return nil, errors.New("received nil response from OpenRouter without error")
-	}
-
-	if openrouterResponse.Choices != nil && openrouterResponse.Choices[0].Message.Content != nil {
-		if err := json.Unmarshal([]byte(*openrouterResponse.Choices[0].Message.Content), &res); err != nil {
-			return nil, fmt.Errorf("failed to decode response content: %w, %s", err, *openrouterResponse.Choices[0].Message.Content)
+		logErr = errors.New("received nil response from OpenRouter without error")
+		if l.Logging != nil && l.Logging.LogResponse != nil {
+			logEntry, createLogErr := l.createLogObject(g.UID, selectedPrompt.UID, input, routerRequest, nil, nil, requestTimeElapsed, selectedPrompt.IsCanary, logErr)
+			if createLogErr == nil {
+				go func(mangoLog *LLMangoLog) {
+					if logErr := l.Logging.LogResponse(mangoLog); logErr != nil {
+						log.Printf("Failed to log nil response: %v", logErr)
+					}
+				}(logEntry)
+			} else {
+				log.Printf("Failed to create log object for nil response: %v", createLogErr)
+			}
 		}
+		return nil, logErr
 	}
 
-	if openrouterResponse.Choices == nil {
-		err = errors.New("llm response had 0 choices in object, error occured")
+	if len(openrouterResponse.Choices) == 0 || openrouterResponse.Choices[0].Message.Content == nil {
+		logErr = errors.New("llm response had 0 choices or nil content")
+		if l.Logging != nil && l.Logging.LogResponse != nil {
+			logEntry, createLogErr := l.createLogObject(g.UID, selectedPrompt.UID, input, routerRequest, openrouterResponse, nil, requestTimeElapsed, selectedPrompt.IsCanary, logErr)
+			if createLogErr == nil {
+				go func(mangoLog *LLMangoLog) {
+					if logErr := l.Logging.LogResponse(mangoLog); logErr != nil {
+						log.Printf("Failed to log empty choices/content response: %v", logErr)
+					}
+				}(logEntry)
+			} else {
+				log.Printf("Failed to create log object for empty choices/content: %v", createLogErr)
+			}
+		}
+		return nil, logErr
 	}
 
-	// Log in a separate goroutine if logging is enabled
+	content := *openrouterResponse.Choices[0].Message.Content
+	if errUnmarshal := json.Unmarshal([]byte(content), &res); errUnmarshal != nil {
+		logErr = fmt.Errorf("failed to decode response content into target struct: %w, content: %s", errUnmarshal, content)
+		if l.Logging != nil && l.Logging.LogResponse != nil {
+			logEntry, createLogErr := l.createLogObject(g.UID, selectedPrompt.UID, input, routerRequest, openrouterResponse, nil, requestTimeElapsed, selectedPrompt.IsCanary, logErr)
+			if createLogErr == nil {
+				go func(mangoLog *LLMangoLog) {
+					if logErr := l.Logging.LogResponse(mangoLog); logErr != nil {
+						log.Printf("Failed to log decoding error response: %v", logErr)
+					}
+				}(logEntry)
+			} else {
+				log.Printf("Failed to create log object for decoding error: %v", createLogErr)
+			}
+		}
+		return nil, logErr
+	}
+
 	if l.Logging != nil && l.Logging.LogResponse != nil {
-		// Create log object
-		logEntry, logErr := createLogObject(l, &g.GoalInfo, selectedPrompt.UID, input, &res, openrouterResponse, requestTimeElapsed, err)
-		if logErr != nil {
-			log.Printf("Failed to create log object: %v", logErr)
+		logEntry, createLogErr := l.createLogObject(g.UID, selectedPrompt.UID, input, routerRequest, openrouterResponse, &res, requestTimeElapsed, selectedPrompt.IsCanary, nil) // Pass nil for error
+		if createLogErr != nil {
+			log.Printf("Failed to create log object for successful response: %v", createLogErr)
 		} else {
-			// Log asynchronously
 			go func(mangoLog *LLMangoLog) {
 				if logErr := l.Logging.LogResponse(mangoLog); logErr != nil {
-					log.Printf("Failed to log response: %v", logErr)
+					log.Printf("Failed to log successful response: %v", logErr)
 				}
 			}(logEntry)
 		}
-	}
-
-	// Return early if there was an error generating the response
-	if err != nil {
-		return nil, err
 	}
 
 	return &res, nil

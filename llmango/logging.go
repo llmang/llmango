@@ -17,19 +17,20 @@ type LLmangoLogFilter struct {
 	MaxTimestamp *int    `json:"maxTimestamp,omitempty"`
 	GoalUID      *string `json:"goalUID,omitempty"`
 	PromptUID    *string `json:"promptUID,omitempty"`
+	Limit        *int    `json:"limit"`
+	Offset       *int    `json:"offset"`
 	IncludeRaw   bool    `json:"includeRaw"`
-	Limit        int     `json:"limit"`
-	Offset       int     `json:"offset"`
 }
 
-// LogObject represents a single log entry
+// LLMangoLog represents a single log entry.
+// UserID and Metadata must be set by custom loggers, they are not part of the default log message passed into the logger.
 type LLMangoLog struct {
 	Timestamp      int     `json:"timestamp"`
 	GoalUID        string  `json:"goalUID"`
 	PromptUID      string  `json:"promptUID"`
-	RawInput       string  `json:"rawInput"`
+	RawRequest     string  `json:"rawInput,omitempty"`
 	InputObject    string  `json:"inputObject"`
-	RawOutput      string  `json:"rawOutput"`
+	RawResponse    string  `json:"rawOutput,omitempty"`
 	OutputObject   string  `json:"outputObject"`
 	InputTokens    int     `json:"inputTokens"`
 	OutputTokens   int     `json:"outputTokens"`
@@ -37,46 +38,58 @@ type LLMangoLog struct {
 	RequestTime    float64 `json:"requestTime"`
 	GenerationTime float64 `json:"generationTime"`
 	Error          string  `json:"error"`
+
+	UserID   string `json:"userID"`
+	Metadata any    `json:"metadata,omitempty"`
 }
 
 type Logging struct {
-	LogPercentage              int                                                //0-100, we always log canaries though
-	LogFullInputOutputMessages bool                                               //this logs the entire input and output nt just the specific vals we got and sent
-	LogResponse                func(*LLMangoLog) error                            //logger
-	GetLogs                    func(*LLmangoLogFilter) ([]LLMangoLog, int, error) //log reteriver
+	LogResponse func(*LLMangoLog) error                            //logger
+	GetLogs     func(*LLmangoLogFilter) ([]LLMangoLog, int, error) //log reteriver
 }
 
 // WARNING: IF YOU DO NOT SLEEP YOU MAY HIT THE GENERATION ENDPOINT TOO FAST RESULTING IN A 404 ERROR.
-// This hits the openrouter getGeneration endpoint.
+// This gathers cost and usage from openrouter getGeneration endpoint.
 // createLogObject builds a log entry from request/response data
-func createLogObject(
-	manager *LLMangoManager,
-	goalInfo *GoalInfo,
+func (mang *LLMangoManager) createLogObject(
+	goalUID string,
 	promptUID string,
-	input interface{},
-	output interface{},
+	input any,
+	request *openrouter.OpenRouterRequest,
 	response *openrouter.NonStreamingChatResponse,
+	output any,
 	requestTime float64,
+	includeRawData bool,
 	err error,
 ) (*LLMangoLog, error) {
 	// Convert input and output to JSON
-	inputJSON, _ := json.Marshal(input)
-	outputJSON, _ := json.Marshal(output)
+	requestJSONString, _ := json.Marshal(request)
+	responseJSONString, _ := json.Marshal(response)
+	inputJSONString, _ := json.Marshal(input)
+	outputJSONString, _ := json.Marshal(output)
 
 	// Create base log object
 	logObject := &LLMangoLog{
-		GoalUID:     goalInfo.UID,
-		PromptUID:   promptUID,
-		RawInput:    string(inputJSON),
-		InputObject: string(inputJSON),
-		RequestTime: requestTime,
+		GoalUID:      goalUID,
+		PromptUID:    promptUID,
+		InputObject:  string(inputJSONString),
+		OutputObject: string(outputJSONString),
+		RequestTime:  requestTime,
+	}
+
+	// Conditionally include raw request/response strings
+	if includeRawData {
+		logObject.RawRequest = string(requestJSONString)
+		logObject.RawResponse = string(responseJSONString)
 	}
 
 	// If there's a response, populate fields from it
 	if response != nil {
+		if mang == nil || mang.OpenRouter == nil {
+			return nil, errors.New("OpenRouter client is not initialized")
+		}
+
 		logObject.Timestamp = int(response.Created)
-		logObject.RawOutput = string(outputJSON)
-		logObject.OutputObject = string(outputJSON)
 
 		if response.Usage != nil {
 			logObject.InputTokens = response.Usage.PromptTokens
@@ -88,12 +101,9 @@ func createLogObject(
 			return nil, errors.New("response ID is empty, cannot retrieve generation stats")
 		}
 
-		if manager == nil || manager.OpenRouter == nil {
-			return nil, errors.New("OpenRouter client is not initialized")
-		}
 		//WARNING: IF YOU DO NOT SLEEP YOU MAY HIT THE GENERATION ENDPOINT TOO FAST RESULTING IN A 404 ERROR
 		time.Sleep(800 * time.Millisecond)
-		stats, apiErr := manager.OpenRouter.GetGenerationStats(response.ID)
+		stats, apiErr := mang.OpenRouter.GetGenerationStats(response.ID)
 		if apiErr != nil {
 			return nil, fmt.Errorf("failed to get OpenRouter generation stats: %w", apiErr)
 		}

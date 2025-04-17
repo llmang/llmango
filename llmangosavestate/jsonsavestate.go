@@ -2,340 +2,202 @@ package llmangosavestate
 
 import (
 	"encoding/json"
-	"fmt"
+	"io"
 	"log"
-	"maps"
 	"os"
-	"reflect"
-	"time"
 
 	"github.com/llmang/llmango/llmango"
 )
 
-type mangoConfigFile struct {
-	PinnedModels []string                     `json:"pinnedModels"`
-	Goals        map[string]*llmango.GoalInfo `json:"goals"`
-	Prompts      map[string]*llmango.Prompt   `json:"prompts"`
+// goalForJSON is an intermediate struct for JSON marshalling/unmarshalling.
+// It excludes fields that should not be persisted or are functions.
+type goalForJSON struct {
+	UID         string `json:"UID"`
+	Title       string `json:"title"`
+	Description string `json:"description"`
+	CreatedAt   int    `json:"createdAt"`
+	UpdatedAt   int    `json:"updatedAt"`
+	// InputExample and OutputExample removed as they are hardcoded
 }
 
+// mangoConfigFile defines the structure of the JSON configuration file.
+type mangoConfigFile struct {
+	Goals   map[string]*goalForJSON    `json:"goals"`
+	Prompts map[string]*llmango.Prompt `json:"prompts"`
+}
+
+// jsonSaveStateFunc saves the current state of the LLMangoManager to a JSON file.
 func jsonSaveStateFunc(mango *llmango.LLMangoManager, fileName string) error {
-	writeObject := struct {
-		Goals   map[string]any             `json:"goals"`
-		Prompts map[string]*llmango.Prompt `json:"prompts"`
-	}{
-		Goals:   mango.Goals,
-		Prompts: mango.Prompts,
+	configToSave := mangoConfigFile{
+		Goals:   make(map[string]*goalForJSON),
+		Prompts: make(map[string]*llmango.Prompt),
+		// PinnedModels could be fetched from somewhere if needed, or left empty
+	}
+
+	// Populate Goals for saving
+	// Corrected: Iterate over items retrieved using GetAll() AND removed Input/Output Examples
+	for uid, goal := range mango.Goals.GetAll() {
+		if goal == nil {
+			continue // skip nil entries if any
+		}
+		configToSave.Goals[uid] = &goalForJSON{
+			UID:         goal.UID,
+			Title:       goal.Title,
+			Description: goal.Description,
+			CreatedAt:   goal.CreatedAt,
+			UpdatedAt:   goal.UpdatedAt,
+			// InputExample and OutputExample removed
+		}
+	}
+
+	// Populate Prompts for saving
+	for uid, prompt := range mango.Prompts.GetAll() {
+		if prompt == nil {
+			continue // skip nil entries if any
+		}
+		// Ensure prompt UID matches key before saving
+		if prompt.UID != uid {
+			log.Printf("WARN: MANGO SAVESTATE: Prompt UID %s does not match map key %s during save. Using map key.", prompt.UID, uid)
+			prompt.UID = uid // Correct it before saving? Or just log? Let's log for now.
+		}
+		configToSave.Prompts[uid] = prompt
 	}
 
 	// Write updated config to file
-	file, err := os.OpenFile(fileName, os.O_WRONLY|os.O_TRUNC, 0644)
+	file, err := os.OpenFile(fileName, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0644)
 	if err != nil {
 		return err
 	}
 	defer file.Close()
 
-	if err := json.NewEncoder(file).Encode(writeObject); err != nil {
+	encoder := json.NewEncoder(file)
+	encoder.SetIndent("", "  ") // Pretty print JSON
+	if err := encoder.Encode(configToSave); err != nil {
 		return err
 	}
+	log.Printf("INFO: MANGO SAVESTATE: State saved to %s", fileName)
 	return nil
 }
 
-// You create an internal LLMang package where you can setup your calls etc this is done manually so that you can use proper goalng structs. You can part it out into different files, you can either place it in your main or you can have it separatly
+// WithJSONSaveState configures the LLMangoManager to use a JSON file for saving and loading state.
 func WithJSONSaveState(fileName string, llmangoManager *llmango.LLMangoManager) (*llmango.LLMangoManager, error) {
 	if fileName == "" {
 		fileName = "mango.json"
 	}
 
-	//setup savestate Func
-	var saveStateFunc func() error = func() error {
+	// Setup saveStateFunc
+	saveStateFunc := func() error {
 		return jsonSaveStateFunc(llmangoManager, fileName)
 	}
 	llmangoManager.SaveState = saveStateFunc
 
-	// Initialize empty config structure
-	config := &mangoConfigFile{
-		Goals:   make(map[string]*llmango.GoalInfo),
-		Prompts: make(map[string]*llmango.Prompt),
-	}
-
+	// Attempt to open the file
 	file, err := os.Open(fileName)
-
 	if os.IsNotExist(err) {
-		file, err = os.Create(fileName)
-		if err != nil {
-			return nil, err
+		// File doesn't exist, create an empty one and return
+		log.Printf("INFO: MANGO SAVESTATE: Config file '%s' not found, creating an empty one.", fileName)
+		initialConfig := &mangoConfigFile{
+			Goals:   make(map[string]*goalForJSON),
+			Prompts: make(map[string]*llmango.Prompt),
 		}
-		defer file.Close()
-
-		if err := json.NewEncoder(file).Encode(config); err != nil {
-			return nil, err
+		emptyFile, createErr := os.OpenFile(fileName, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0644)
+		if createErr != nil {
+			return nil, createErr
 		}
-		log.Printf("INFO: MANGO: new empty config file created at %s", fileName)
+		defer emptyFile.Close()
+		encoder := json.NewEncoder(emptyFile)
+		encoder.SetIndent("", "  ")
+		if encodeErr := encoder.Encode(initialConfig); encodeErr != nil {
+			return nil, encodeErr
+		}
+		// No data to load, just return the manager
 		return llmangoManager, nil
-	}
-
-	if err != nil {
+	} else if err != nil {
+		// Other error opening file
 		return nil, err
 	}
-
 	defer file.Close()
 
+	// Read file content
+	fileBytes, readErr := io.ReadAll(file)
+	if readErr != nil {
+		return nil, readErr
+	}
+
 	// Decode file contents into config
-	if err := json.NewDecoder(file).Decode(config); err != nil {
-		return nil, fmt.Errorf("failed to decode config file: %w", err)
+	var loadedConfig mangoConfigFile
+	if err := json.Unmarshal(fileBytes, &loadedConfig); err != nil {
+		log.Printf("ERROR: MANGO SAVESTATE: Failed to decode config file '%s': %v. Check JSON validity.", fileName, err)
+		// Decide whether to return error or proceed with default empty config
+		// For now, let's return the error.
+		return nil, err // fmt.Errorf("failed to decode config file '%s': %w", fileName, err)
 	}
 
-	if config.Prompts == nil {
-		config.Prompts = make(map[string]*llmango.Prompt)
-	}
+	// --- Load Goals ---
+	if loadedConfig.Goals != nil {
+		goalsToLoad := make([]*llmango.Goal, 0, len(loadedConfig.Goals))
+		for uid, gj := range loadedConfig.Goals {
+			if gj == nil {
+				log.Printf("WARN: MANGO SAVESTATE: Skipping nil goal entry with key %s in config file.", uid)
+				continue
+			}
+			if gj.UID == "" {
+				gj.UID = uid // Assign map key as UID if missing in JSON object
+				log.Printf("WARN: MANGO SAVESTATE: Assigning map key '%s' as UID for goal with empty UID field.", uid)
+			} else if gj.UID != uid {
+				log.Printf("WARN: MANGO SAVESTATE: Goal UID '%s' in JSON object does not match map key '%s'. Using UID from JSON object.", gj.UID, uid)
+				// Potentially problematic, but we'll trust the JSON object's UID primarily.
+			}
 
-	if config.Goals == nil {
-		config.Goals = make(map[string]*llmango.GoalInfo)
-	}
-
-	//initialize prompts
-	if llmangoManager.Prompts == nil {
-		llmangoManager.Prompts = make(map[string]*llmango.Prompt)
-	}
-
-	// Ensure prompt UIDs match their map keys
-	for key, prompt := range config.Prompts {
-		if prompt.UID == "" {
-			prompt.UID = key
-		} else if prompt.UID != key {
-			log.Printf("INFO: MANGO: Updating prompt UID from %s to %s to match key", prompt.UID, key)
-			prompt.UID = key
+			// Create the llmango.Goal struct. Input/Output validators are not persisted.
+			goal := &llmango.Goal{
+				UID:         gj.UID,
+				Title:       gj.Title,
+				Description: gj.Description,
+				CreatedAt:   gj.CreatedAt,
+				UpdatedAt:   gj.UpdatedAt,
+				// PromptUIDs will be populated by AddPrompts later
+				// InputOutput field is omitted here; AddOrUpdateGoals preserves the existing one
+			}
+			goalsToLoad = append(goalsToLoad, goal)
 		}
+		// Use AddOrUpdateGoals which preserves existing Input/Output handlers if goal already exists
+		llmangoManager.AddOrUpdateGoals(goalsToLoad...)
+		log.Printf("INFO: MANGO SAVESTATE: Loaded/Updated %d goals from %s", len(goalsToLoad), fileName)
+	} else {
+		log.Printf("INFO: MANGO SAVESTATE: No 'goals' section found or it's empty in %s", fileName)
 	}
 
-	maps.Copy(llmangoManager.Prompts, config.Prompts)
+	// --- Load Prompts ---
+	if loadedConfig.Prompts != nil {
+		promptsToLoad := make([]*llmango.Prompt, 0, len(loadedConfig.Prompts))
+		for uid, p := range loadedConfig.Prompts {
+			if p == nil {
+				log.Printf("WARN: MANGO SAVESTATE: Skipping nil prompt entry with key %s in config file.", uid)
+				continue
+			}
+			if p.UID == "" {
+				p.UID = uid // Assign map key as UID if missing
+				log.Printf("WARN: MANGO SAVESTATE: Assigning map key '%s' as UID for prompt with empty UID field.", uid)
+			} else if p.UID != uid {
+				log.Printf("WARN: MANGO SAVESTATE: Prompt UID '%s' in JSON object does not match map key '%s'. Using UID from JSON object.", p.UID, uid)
+			}
+			// GoalUID association will be handled by AddPrompts
+			promptsToLoad = append(promptsToLoad, p)
+		}
+		// AddPrompts handles associating prompts with goals
+		llmangoManager.AddPrompts(promptsToLoad...)
+		log.Printf("INFO: MANGO SAVESTATE: Loaded/Updated %d prompts from %s", len(promptsToLoad), fileName)
+	} else {
+		log.Printf("INFO: MANGO SAVESTATE: No 'prompts' section found or it's empty in %s", fileName)
+	}
 
-	loadConfig(llmangoManager, config.Goals)
-
-	// Save the state to persist any updates
-	err = llmangoManager.SaveState()
-	if err != nil {
-		log.Printf("ERROR: MANGO: Failed to save state after loading: %v", err)
+	// Save state immediately after loading to potentially fix UIDs or add timestamps if logic requires it
+	// (Though AddOrUpdateGoals/AddPrompts should handle timestamps now)
+	if err := llmangoManager.SaveState(); err != nil {
+		log.Printf("ERROR: MANGO SAVESTATE: Failed to save state immediately after loading: %v", err)
+		// Decide if this should be a fatal error
 	}
 
 	return llmangoManager, nil
-}
-
-// this will parse the config if there currently is one and load the prompts and solutions into the object
-func loadConfig(m *llmango.LLMangoManager, fileGoalsInfo map[string]*llmango.GoalInfo) error {
-	// --- Associate loaded prompts with goals using reflection ---
-	promptUIDsForGoal := make(map[string]map[string]struct{}) // GoalUID -> set of PromptUIDs
-
-	// Build the map from GoalUID to its associated PromptUIDs based on loaded prompts
-	for _, prompt := range m.Prompts {
-		if prompt.GoalUID != "" {
-			if _, exists := promptUIDsForGoal[prompt.GoalUID]; !exists {
-				promptUIDsForGoal[prompt.GoalUID] = make(map[string]struct{})
-			}
-			promptUIDsForGoal[prompt.GoalUID][prompt.UID] = struct{}{}
-		}
-	}
-
-	// Iterate through the goals in the manager and update their PromptUIDs lists
-	for goalUID, goalAny := range m.Goals {
-		goalValue := reflect.ValueOf(goalAny)
-
-		// Ensure it's a pointer to a struct
-		if goalValue.Kind() != reflect.Ptr || goalValue.IsNil() {
-			log.Printf("WARN: MANGO: Goal %s is not a non-nil pointer, skipping prompt association. Type: %T", goalUID, goalAny)
-			continue
-		}
-		goalElem := goalValue.Elem()
-		if goalElem.Kind() != reflect.Struct {
-			log.Printf("WARN: MANGO: Goal %s is not a pointer to a struct, skipping prompt association. Type: %T", goalUID, goalAny)
-			continue
-		}
-
-		if loadedPromptSet, goalHasPrompts := promptUIDsForGoal[goalUID]; goalHasPrompts {
-			promptUIDsField := goalElem.FieldByName("PromptUIDs")
-			if !promptUIDsField.IsValid() {
-				log.Printf("WARN: MANGO: Goal %s (Type: %T) has no PromptUIDs field, skipping prompt association.", goalUID, goalAny)
-				continue
-			}
-			if !promptUIDsField.CanSet() {
-				log.Printf("WARN: MANGO: Cannot set PromptUIDs field for goal %s (Type: %T), skipping prompt association.", goalUID, goalAny)
-				continue
-			}
-			if promptUIDsField.Kind() != reflect.Slice {
-				log.Printf("WARN: MANGO: PromptUIDs field for goal %s (Type: %T) is not a slice, skipping prompt association.", goalUID, goalAny)
-				continue
-			}
-
-			// Initialize PromptUIDs slice if nil
-			if promptUIDsField.IsNil() {
-				// Create a new slice of the appropriate type (string)
-				newSlice := reflect.MakeSlice(promptUIDsField.Type(), 0, len(loadedPromptSet))
-				promptUIDsField.Set(newSlice)
-			}
-
-			// Get current slice value
-			currentPromptUIDsVal := promptUIDsField.Interface()
-			currentPromptUIDs, ok := currentPromptUIDsVal.([]string)
-			if !ok {
-				log.Printf("ERROR: MANGO: Could not assert PromptUIDs field for goal %s (Type: %T) as []string.", goalUID, goalAny)
-				continue
-			}
-
-			// Create a set of existing prompt UIDs for efficient lookup
-			existingPromptSet := make(map[string]struct{}, len(currentPromptUIDs))
-			for _, existingUID := range currentPromptUIDs {
-				existingPromptSet[existingUID] = struct{}{}
-			}
-
-			// Append prompts from the loaded set if they are not already present
-			updatedSlice := promptUIDsField // Start with the existing slice
-			added := false
-			for loadedPromptUID := range loadedPromptSet {
-				if _, alreadyExists := existingPromptSet[loadedPromptUID]; !alreadyExists {
-					// Append using reflection
-					updatedSlice = reflect.Append(updatedSlice, reflect.ValueOf(loadedPromptUID))
-					// log.Printf("INFO: MANGO: Associated prompt %s with goal %s", loadedPromptUID, goalUID)
-					added = true
-				}
-			}
-
-			// Only set if changed
-			if added {
-				promptUIDsField.Set(updatedSlice)
-			}
-		}
-	}
-	// --- End of Prompt Association Logic ---
-
-	// --- Update Goal Metadata (Title, Description) using reflection ---
-	if fileGoalsInfo == nil {
-		return nil
-	}
-
-	// Iterate through config goal info and update corresponding manager goals
-	for uid, info := range fileGoalsInfo {
-		if goalAny, exists := m.Goals[uid]; exists {
-			goalValue := reflect.ValueOf(goalAny)
-
-			// Ensure it's a pointer to a struct
-			if goalValue.Kind() != reflect.Ptr || goalValue.IsNil() {
-				log.Printf("WARN: MANGO: Goal %s is not a non-nil pointer, skipping metadata update. Type: %T", uid, goalAny)
-				continue
-			}
-			goalElem := goalValue.Elem()
-			if goalElem.Kind() != reflect.Struct {
-				log.Printf("WARN: MANGO: Goal %s is not a pointer to a struct, skipping metadata update. Type: %T", uid, goalAny)
-				continue
-			}
-
-			// --- Update UID Field ---
-			uidField := goalElem.FieldByName("UID")
-			if uidField.IsValid() && uidField.CanSet() && uidField.Kind() == reflect.String {
-				if uidField.String() != uid {
-					log.Printf("WARN: MANGO: Goal UID mismatch for %s, updating manager goal UID.", uid)
-					uidField.SetString(uid)
-				}
-			} else {
-				log.Printf("WARN: MANGO: Cannot access or set UID field for goal %s (Type: %T).", uid, goalAny)
-			}
-
-			// --- Update Title Field ---
-			if info.Title != "" {
-				titleField := goalElem.FieldByName("Title")
-				if titleField.IsValid() && titleField.CanSet() && titleField.Kind() == reflect.String {
-					if titleField.String() != info.Title {
-						titleField.SetString(info.Title)
-						log.Printf("INFO: MANGO: Updated title for goal %s", uid)
-					}
-				} else {
-					log.Printf("WARN: MANGO: Cannot access or set Title field for goal %s (Type: %T).", uid, goalAny)
-				}
-			}
-
-			// --- Update Description Field ---
-			if info.Description != "" {
-				descField := goalElem.FieldByName("Description")
-				if descField.IsValid() && descField.CanSet() && descField.Kind() == reflect.String {
-					if descField.String() != info.Description {
-						descField.SetString(info.Description)
-						log.Printf("INFO: MANGO: Updated description for goal %s", uid)
-					}
-				} else {
-					log.Printf("WARN: MANGO: Cannot access or set Description field for goal %s (Type: %T).", uid, goalAny)
-				}
-			}
-
-		} else {
-			log.Printf("WARN: MANGO: Goal %s from file not found in manager", uid)
-		}
-	}
-	// --- End of Goal Metadata Update ---
-
-	return nil
-}
-
-// updateTimestamps sets CreatedAt and UpdatedAt fields to current Unix time if they are empty (0)
-// Uses reflection to handle generic Goal types
-func updateTimestamps(m *llmango.LLMangoManager) {
-	currentTime := int64(time.Now().Unix()) // Use int64 for time
-	log.Printf("INFO: MANGO: Setting timestamps to %d for empty values", currentTime)
-
-	// Update timestamps for prompts using map keys (Prompts are concrete types)
-	for key := range m.Prompts {
-		prompt := m.Prompts[key]
-		if prompt.CreatedAt == 0 {
-			prompt.CreatedAt = int(currentTime) // Assuming Prompt.CreatedAt is int
-			log.Printf("INFO: MANGO: Updated CreatedAt for prompt %s", key)
-		}
-		if prompt.UpdatedAt == 0 {
-			prompt.UpdatedAt = int(currentTime) // Assuming Prompt.UpdatedAt is int
-			log.Printf("INFO: MANGO: Updated UpdatedAt for prompt %s", key)
-		}
-	}
-
-	// Update timestamps for goals using reflection
-	for key, goalAny := range m.Goals {
-		goalValue := reflect.ValueOf(goalAny)
-
-		// Ensure it's a pointer to a struct
-		if goalValue.Kind() != reflect.Ptr || goalValue.IsNil() {
-			log.Printf("WARN: MANGO: Goal %s is not a non-nil pointer, skipping timestamp update. Type: %T", key, goalAny)
-			continue
-		}
-		goalElem := goalValue.Elem()
-		if goalElem.Kind() != reflect.Struct {
-			log.Printf("WARN: MANGO: Goal %s is not a pointer to a struct, skipping timestamp update. Type: %T", key, goalAny)
-			continue
-		}
-
-		// Update CreatedAt
-		createdAtField := goalElem.FieldByName("CreatedAt")
-		if createdAtField.IsValid() && createdAtField.CanSet() {
-			if createdAtField.Kind() == reflect.Int || createdAtField.Kind() == reflect.Int64 {
-				if createdAtField.Int() == 0 {
-					createdAtField.SetInt(currentTime)
-					log.Printf("INFO: MANGO: Updated CreatedAt for goal %s", key)
-				}
-			} else {
-				log.Printf("WARN: MANGO: CreatedAt field for goal %s (Type: %T) is not an int/int64.", key, goalAny)
-			}
-		} else {
-			log.Printf("WARN: MANGO: Cannot access or set CreatedAt field for goal %s (Type: %T).", key, goalAny)
-		}
-
-		// Update UpdatedAt
-		updatedAtField := goalElem.FieldByName("UpdatedAt")
-		if updatedAtField.IsValid() && updatedAtField.CanSet() {
-			if updatedAtField.Kind() == reflect.Int || updatedAtField.Kind() == reflect.Int64 {
-				if updatedAtField.Int() == 0 {
-					updatedAtField.SetInt(currentTime)
-					log.Printf("INFO: MANGO: Updated UpdatedAt for goal %s", key)
-				}
-			} else {
-				log.Printf("WARN: MANGO: UpdatedAt field for goal %s (Type: %T) is not an int/int64.", key, goalAny)
-			}
-		} else {
-			log.Printf("WARN: MANGO: Cannot access or set UpdatedAt field for goal %s (Type: %T).", key, goalAny)
-		}
-	}
 }

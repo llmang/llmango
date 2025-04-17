@@ -2,7 +2,7 @@ package llmango
 
 import (
 	"fmt"
-	"reflect"
+	"slices"
 	"time"
 
 	"github.com/llmang/llmango/openrouter"
@@ -13,21 +13,20 @@ var MAX_BACKOFF_ATTEMPTS = 10
 var BASE_BACKOFF_DELAY = 100 * time.Millisecond
 
 type LLMangoManager struct {
-	SAFTEYSHUTOFF  bool
 	RetryRateLimit bool
 	OpenRouter     *openrouter.OpenRouter
-	Prompts        map[string]*Prompt
-	Goals          map[string]any
+	Goals          SyncedMap[string, *Goal]
+	Prompts        SyncedMap[string, *Prompt]
 	SaveState      func() error
-	*Logging
+	Logging        *Logging
 }
 
 func CreateLLMangoManger(o *openrouter.OpenRouter) (*LLMangoManager, error) {
 	// defaultFileName := "llmango.json"
 	return &LLMangoManager{
 		OpenRouter: o,
-		Prompts:    make(map[string]*Prompt),
-		Goals:      make(map[string]any),
+		Prompts:    SyncedMap[string, *Prompt]{},
+		Goals:      SyncedMap[string, *Goal]{},
 	}, nil
 }
 
@@ -47,21 +46,21 @@ type Prompt struct {
 	TotalRuns int  `json:"totalRuns"`
 }
 
-type GoalInfo struct {
-	UID         string `json:"UID"`
-	Title       string `json:"title"`
-	Description string `json:"description"`
-	CreatedAt   int    `json:"createdAt"`
-	UpdatedAt   int    `json:"updatedAt"`
+type Goal struct {
+	UID         string   `json:"UID"`
+	Title       string   `json:"title"`
+	Description string   `json:"description"`
+	CreatedAt   int      `json:"createdAt"`
+	UpdatedAt   int      `json:"updatedAt"`
+	PromptUIDs  []string `json:"promptUIDs" savestate:"-"` //built during runtime so make sure to not save it in json or database
+	InputOutput[any, any]
 }
 
-// Do we want to add the ability to
-type Goal[Input any, Output any] struct {
-	GoalInfo
-	Validator     func(*Output) bool `json:"-"`
-	ExampleInput  Input              `json:"exampleInput"`
-	ExampleOutput Output             `json:"exampleOutput"`
-	PromptUIDs    []string           `json:"promptUIDs"`
+type InputOutput[input any, output any] struct {
+	InputExample    input             `json:"inputExample"`
+	InputValidator  func(input) bool  `json:"-"`
+	OutputExample   output            `json:"outputExample"`
+	OutputValidator func(output) bool `json:"-"`
 }
 
 type Result[T any] struct {
@@ -78,112 +77,85 @@ func (re *ResultError) Error() string {
 	return fmt.Sprintf("Mango error occured: Reason:%v Message: %v", re.Reason, re.Message)
 }
 
-func (m *LLMangoManager) AddPromptToGoal(goalUID, promptUID string) error {
-	goalAny, ok := m.Goals[goalUID]
-	if !ok {
-		return fmt.Errorf("goal with UID '%s' not found", goalUID)
-	}
-
-	goalValue := reflect.ValueOf(goalAny)
-
-	// Check if goalAny is a pointer, if so, get the element it points to
-	if goalValue.Kind() == reflect.Ptr {
-		goalValue = goalValue.Elem()
-	}
-
-	// Ensure we are working with a struct
-	if goalValue.Kind() != reflect.Struct {
-		return fmt.Errorf("goal with UID '%s' is not a struct, but %v", goalUID, goalValue.Kind())
-	}
-
-	promptUIDsField := goalValue.FieldByName("PromptUIDs")
-	if !promptUIDsField.IsValid() {
-		return fmt.Errorf("goal struct for UID '%s' does not have a 'PromptUIDs' field", goalUID)
-	}
-
-	if promptUIDsField.Kind() != reflect.Slice {
-		return fmt.Errorf("'PromptUIDs' field for goal UID '%s' is not a slice, but %v", goalUID, promptUIDsField.Kind())
-	}
-
-	// Check if the slice element type is string
-	if promptUIDsField.Type().Elem().Kind() != reflect.String {
-		return fmt.Errorf("'PromptUIDs' field for goal UID '%s' is not a slice of strings, but slice of %v", goalUID, promptUIDsField.Type().Elem().Kind())
-	}
-
-	// Check if the field is addressable and settable
-	if !promptUIDsField.CanSet() {
-		// This might happen if goalAny was not a pointer originally.
-		// We need a pointer to modify the original struct in the map.
-		// Let's try getting a pointer to the value if it's addressable.
-		if goalValue.CanAddr() {
-			goalPtrValue := goalValue.Addr()
-			promptUIDsField = goalPtrValue.Elem().FieldByName("PromptUIDs") // Re-fetch the field from the addressable struct
-			if !promptUIDsField.CanSet() {
-				return fmt.Errorf("cannot set 'PromptUIDs' field for goal UID '%s', ensure the goal in the map is a pointer or the map stores addressable structs", goalUID)
+// AddOrUpdateGoals adds or updates goals in the LLMangoManager.
+// It updates the Title, Description, CreatedAt, and UpdatedAt fields of existing goals.
+// It does NOT overwrite the InputOutput field of existing goals.
+func (m *LLMangoManager) AddOrUpdateGoals(goals ...*Goal) {
+	now := int(time.Now().Unix())
+	for _, goal := range goals {
+		if goal != nil && goal.UID != "" {
+			if goal.CreatedAt == 0 {
+				goal.CreatedAt = now
 			}
-		} else {
-			return fmt.Errorf("cannot set 'PromptUIDs' field for goal UID '%s', the goal value is not addressable", goalUID)
+			if goal.UpdatedAt == 0 {
+				goal.UpdatedAt = now
+			}
+			if m.Goals.Exists(goal.UID) {
+				existingGoal := m.Goals.Get(goal.UID)
+				existingGoal.Title = goal.Title
+				existingGoal.Description = goal.Description
+				existingGoal.CreatedAt = goal.CreatedAt
+				existingGoal.UpdatedAt = goal.UpdatedAt
+				m.Goals.Set(goal.UID, existingGoal)
+			} else {
+				goal.PromptUIDs = []string{}
+				m.Goals.Set(goal.UID, goal)
+				for _, prompt := range m.Prompts.m {
+					if prompt != nil && prompt.GoalUID == goal.UID {
+						goal.PromptUIDs = append(goal.PromptUIDs, prompt.UID)
+					}
+				}
+				m.Goals.Set(goal.UID, goal)
+			}
 		}
 	}
-
-	// Append the new promptUID
-	newPromptUIDs := reflect.Append(promptUIDsField, reflect.ValueOf(promptUID))
-	promptUIDsField.Set(newPromptUIDs)
-
-	// If the original value in the map was not a pointer, update the map with the modified struct
-	// This path is less likely if goals are typically stored as pointers.
-	// if reflect.ValueOf(goalAny).Kind() != reflect.Ptr && goalValue.CanAddr() {
-	// 	m.Goals[goalUID] = goalValue.Interface() // Update map with the modified struct value
-	// }
-	// No need to update the map explicitly if goalAny was already a pointer, as we modified the pointed-to struct.
-
-	return nil
 }
 
-// UpdateGoalTitleDescription updates the Title and Description fields of a goal using reflection.
-// The goal parameter must be a pointer to a struct or an addressable struct value.
-func UpdateGoalTitleDescription(goal any, title, description string) error {
-	val := reflect.ValueOf(goal)
+// AddGoals adds or updates goals in the LLMangoManager.
+// It overwrites the entire goal object if a goal with the same UID already exists.
+func (m *LLMangoManager) AddGoals(goals ...*Goal) {
+	now := int(time.Now().Unix())
+	for _, goal := range goals {
+		if goal != nil && goal.UID != "" {
+			if goal.CreatedAt == 0 {
+				goal.CreatedAt = now
+			}
+			if goal.UpdatedAt == 0 {
+				goal.UpdatedAt = now
+			}
+			goal.PromptUIDs = []string{}
+			m.Goals.Set(goal.UID, goal)
+			for _, prompt := range m.Prompts.m {
+				if prompt != nil && prompt.GoalUID == goal.UID {
+					goal.PromptUIDs = append(goal.PromptUIDs, prompt.UID)
+				}
+			}
+			m.Goals.Set(goal.UID, goal)
+		}
+	}
+}
 
-	// Ensure goal is a pointer to a struct
-	if val.Kind() != reflect.Ptr {
-		return fmt.Errorf("goal must be a pointer to a struct, got %s", val.Kind())
+// AddPrompts adds or updates prompts in the LLMangoManager.
+// It always overwrites the entire prompt object if a prompt with the same UID already exists.
+func (m *LLMangoManager) AddPrompts(prompts ...*Prompt) {
+	now := int(time.Now().Unix())
+	for _, prompt := range prompts {
+		if prompt != nil && prompt.UID != "" {
+			if prompt.CreatedAt == 0 {
+				prompt.CreatedAt = now
+			}
+			if prompt.UpdatedAt == 0 {
+				prompt.UpdatedAt = now
+			}
+			m.Prompts.Set(prompt.UID, prompt)
+			if prompt.GoalUID != "" && m.Goals.Exists(prompt.GoalUID) {
+				goal := m.Goals.Get(prompt.GoalUID)
+				found := slices.Contains(goal.PromptUIDs, prompt.UID)
+				if !found {
+					goal.PromptUIDs = append(goal.PromptUIDs, prompt.UID)
+					m.Goals.Set(goal.UID, goal)
+				}
+			}
+		}
 	}
-	val = val.Elem() // Dereference the pointer to get the struct value
-
-	// Ensure we are dealing with a struct
-	if val.Kind() != reflect.Struct {
-		// This should technically not happen if the input is pointer-to-struct, but good practice
-		return fmt.Errorf("goal element is not a struct, kind: %s", val.Kind())
-	}
-
-	// Get the Title field
-	titleField := val.FieldByName("Title")
-	if !titleField.IsValid() {
-		return fmt.Errorf("goal struct does not have a 'Title' field")
-	}
-	if !titleField.CanSet() {
-		return fmt.Errorf("'Title' field cannot be set (is it exported?)")
-	}
-	if titleField.Kind() != reflect.String {
-		return fmt.Errorf("'Title' field is not a string")
-	}
-
-	// Get the Description field
-	descField := val.FieldByName("Description")
-	if !descField.IsValid() {
-		return fmt.Errorf("goal struct does not have a 'Description' field")
-	}
-	if !descField.CanSet() {
-		return fmt.Errorf("'Description' field cannot be set (is it exported?)")
-	}
-	if descField.Kind() != reflect.String {
-		return fmt.Errorf("'Description' field is not a string")
-	}
-
-	// Set the values
-	titleField.SetString(title)
-	descField.SetString(description)
-
-	return nil
 }

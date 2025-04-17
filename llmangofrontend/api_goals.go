@@ -5,14 +5,14 @@ import (
 	"fmt"
 	"log"
 	"net/http"
-	"reflect"
 	"sort"
 	"strconv"
+	"time"
 
 	"github.com/llmang/llmango/llmango"
 )
 
-// handleUpdateGoal updates a goal's title and description using the helper function
+// handleUpdateGoal updates a goal's title and description
 func (r *APIRouter) handleUpdateGoal(w http.ResponseWriter, req *http.Request) {
 	goalUID := req.PathValue("goaluid")
 	if goalUID == "" {
@@ -20,116 +20,99 @@ func (r *APIRouter) handleUpdateGoal(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	goalAny, exists := r.Goals[goalUID]
-	if !exists {
+	if r.LLMangoManager == nil {
+		ServerError(w, fmt.Errorf("LLMangoManager not initialized"))
+		return
+	}
+
+	// Check existence and get the goal from the manager's map
+	if !r.LLMangoManager.Goals.Exists(goalUID) {
 		w.WriteHeader(http.StatusNotFound)
 		w.Write([]byte("Goal not found"))
 		return
 	}
+	goal := r.LLMangoManager.Goals.Get(goalUID)
 
 	var updateReq struct {
-		Title       string `json:"title"`
-		Description string `json:"description"`
+		Title       *string `json:"title,omitempty"` // Use pointers to check presence
+		Description *string `json:"description,omitempty"`
 	}
 
 	if err := json.NewDecoder(req.Body).Decode(&updateReq); err != nil {
-		BadRequest(w, "Invalid request body")
+		BadRequest(w, "Invalid request body: "+err.Error())
 		return
 	}
 
-	// Call the helper function from the llmango package
-	// goalAny must be a pointer for the changes to persist in the map
-	err := llmango.UpdateGoalTitleDescription(goalAny, updateReq.Title, updateReq.Description)
-	if err != nil {
-		// Log the specific reflection error
-		log.Printf("Error updating goal '%s' via reflection: %v", goalUID, err)
-		// Provide a slightly more generic error to the client
-		ServerError(w, fmt.Errorf("failed to update goal fields: %w", err))
-		return
+	updated := false
+	if updateReq.Title != nil && *updateReq.Title != goal.Title {
+		goal.Title = *updateReq.Title
+		updated = true
+	}
+	if updateReq.Description != nil && *updateReq.Description != goal.Description {
+		goal.Description = *updateReq.Description
+		updated = true
 	}
 
-	// Save state after updating the goal
-	if r.SaveState != nil {
-		if err := r.SaveState(); err != nil {
-			log.Printf("SaveState failed with error: %v\n", err)
-			ServerError(w, err)
-			return
+	// If changes were made, update timestamp and save
+	if updated {
+		goal.UpdatedAt = int(time.Now().Unix())
+		r.LLMangoManager.Goals.Set(goalUID, goal) // Save back to the SyncedMap
+
+		// Save state after updating the goal
+		if r.LLMangoManager.SaveState != nil {
+			if err := r.LLMangoManager.SaveState(); err != nil {
+				// Log the error but do not fail the request
+				log.Printf("WARN: SaveState failed after updating goal %s: %v", goalUID, err)
+				// ServerError(w, err) // Removed
+				// Consider rollback? Revert goal changes?
+				// return // Removed
+			}
 		}
 	}
 
-	// Return the updated goal as JSON response
+	// Return the potentially updated goal as JSON response
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(goalAny) // Encode the original (now modified) object
+	json.NewEncoder(w).Encode(goal) // Encode the goal object
 }
 
 // handleGetGoals handles getting all goals with pagination
 func (r *APIRouter) handleGetGoals(w http.ResponseWriter, req *http.Request) {
 	// Get limit from header
-	limit := 0 // default limit
+	limit := -1 // default: no limit
 	if limitStr := req.Header.Get("limit"); limitStr != "" {
 		if l, err := strconv.Atoi(limitStr); err == nil && l > 0 {
 			limit = l
 		}
 	}
 
-	// Get all goals and convert to a slice for sorting
-	// We need to use reflection to access GoalInfo fields from the map[string]any
-	goalsSlice := make([]any, 0, len(r.Goals))
-	for _, goal := range r.Goals {
+	if r.LLMangoManager == nil {
+		ServerError(w, fmt.Errorf("LLMangoManager not initialized"))
+		return
+	}
+
+	// Get all goals using GetAll
+	allGoalsMap := r.LLMangoManager.Goals.GetAll()
+
+	// Convert map to slice for sorting
+	goalsSlice := make([]*llmango.Goal, 0, len(allGoalsMap))
+	for _, goal := range allGoalsMap {
 		goalsSlice = append(goalsSlice, goal)
 	}
 
-	// Sort the goals slice using reflection
+	// Sort the goals slice directly using Goal fields
 	sort.Slice(goalsSlice, func(i, j int) bool {
 		goalI := goalsSlice[i]
 		goalJ := goalsSlice[j]
 
-		valI := reflect.ValueOf(goalI)
-		valJ := reflect.ValueOf(goalJ)
-
-		// Ensure they are pointers and get the element
-		if valI.Kind() == reflect.Ptr {
-			valI = valI.Elem()
-		}
-		if valJ.Kind() == reflect.Ptr {
-			valJ = valJ.Elem()
+		if goalI.UpdatedAt != goalJ.UpdatedAt {
+			return goalI.UpdatedAt > goalJ.UpdatedAt // Descending UpdatedAt
 		}
 
-		// Access GoalInfo struct (assuming it's the first embedded field or named GoalInfo)
-		// This assumes a consistent structure for Goal types
-		goalInfoIField := valI.FieldByName("GoalInfo")
-		goalInfoJField := valJ.FieldByName("GoalInfo")
-
-		// Fallback if GoalInfo field isn't found directly (might be embedded anonymously)
-		// This part is tricky and might need adjustment based on exact Goal struct definition
-		if !goalInfoIField.IsValid() || !goalInfoJField.IsValid() {
-			// Attempt to find embedded GoalInfo fields indirectly - this is less robust
-			// Or handle error/log warning
-			log.Printf("Warning: Could not find GoalInfo field directly for sorting goal. Check Goal struct definition.")
-			// As a basic fallback, sort by UID if possible, else keep original order
-			uidIField := valI.FieldByName("UID")
-			uidJField := valJ.FieldByName("UID")
-			if uidIField.IsValid() && uidJField.IsValid() && uidIField.Kind() == reflect.String && uidJField.Kind() == reflect.String {
-				return uidIField.String() < uidJField.String() // Basic UID sort if timestamps fail
-			}
-			return false // Keep original order if fields inaccessible
+		if goalI.CreatedAt != goalJ.CreatedAt {
+			return goalI.CreatedAt > goalJ.CreatedAt // Descending CreatedAt
 		}
 
-		updatedAtI := goalInfoIField.FieldByName("UpdatedAt").Int()
-		updatedAtJ := goalInfoJField.FieldByName("UpdatedAt").Int()
-		if updatedAtI != updatedAtJ {
-			return updatedAtI > updatedAtJ // Descending UpdatedAt
-		}
-
-		createdAtI := goalInfoIField.FieldByName("CreatedAt").Int()
-		createdAtJ := goalInfoJField.FieldByName("CreatedAt").Int()
-		if createdAtI != createdAtJ {
-			return createdAtI > createdAtJ // Descending CreatedAt
-		}
-
-		titleI := goalInfoIField.FieldByName("Title").String()
-		titleJ := goalInfoJField.FieldByName("Title").String()
-		return titleI < titleJ // Ascending Title for ties
+		return goalI.Title < goalJ.Title // Ascending Title for ties
 	})
 
 	// Apply limit if specified
@@ -138,6 +121,7 @@ func (r *APIRouter) handleGetGoals(w http.ResponseWriter, req *http.Request) {
 		finalGoals = goalsSlice[:limit]
 	}
 
+	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(finalGoals)
 }
 
@@ -149,12 +133,19 @@ func (r *APIRouter) handleGetGoal(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	goal, exists := r.Goals[goalUID]
-	if !exists {
+	if r.LLMangoManager == nil {
+		ServerError(w, fmt.Errorf("LLMangoManager not initialized"))
+		return
+	}
+
+	// Use Exists() and Get() on the manager's map
+	if !r.LLMangoManager.Goals.Exists(goalUID) {
 		w.WriteHeader(http.StatusNotFound)
 		w.Write([]byte("Goal not found"))
 		return
 	}
+	goal := r.LLMangoManager.Goals.Get(goalUID)
 
+	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(goal)
 }

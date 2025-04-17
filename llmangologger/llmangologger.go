@@ -13,8 +13,7 @@ type MangoLoggingSetup struct {
 }
 
 type MangoLoggingOptions struct {
-	LogFullInputOutputMessages bool
-	LogPercentage              int
+	LogRawRequestResponse bool
 }
 
 func UseLogger(m *llmango.LLMangoManager, logger *log.Logger, opts *MangoLoggingOptions) error {
@@ -22,25 +21,29 @@ func UseLogger(m *llmango.LLMangoManager, logger *log.Logger, opts *MangoLogging
 		return errors.New("logger cannot be nil")
 	}
 
-	m.LogResponse = func(mangolog *llmango.LLMangoLog) error {
+	m.Logging.LogResponse = func(mangolog *llmango.LLMangoLog) error {
+		if opts == nil || !opts.LogRawRequestResponse {
+			mangolog.RawRequest = ""
+			mangolog.RawResponse = ""
+		}
 		logger.Println(mangolog)
 		return nil
 	}
-	m.GetLogs = nil
-	m.LogPercentage = opts.LogPercentage
-	m.LogFullInputOutputMessages = opts.LogFullInputOutputMessages
+	m.Logging.GetLogs = nil
 
 	return nil
 }
 
 func UseConsoleLogging(m *llmango.LLMangoManager, opts *MangoLoggingOptions) error {
-	m.LogResponse = func(mangolog *llmango.LLMangoLog) error {
+	m.Logging.LogResponse = func(mangolog *llmango.LLMangoLog) error {
+		if opts != nil || !opts.LogRawRequestResponse {
+			mangolog.RawRequest = ""
+			mangolog.RawResponse = ""
+		}
 		log.Printf("MANGO: %v\n", mangolog)
 		return nil
 	}
-	m.GetLogs = nil
-	m.LogPercentage = opts.LogPercentage
-	m.LogFullInputOutputMessages = opts.LogFullInputOutputMessages
+	m.Logging.GetLogs = nil
 
 	return nil
 }
