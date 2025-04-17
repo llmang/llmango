@@ -63,7 +63,7 @@ func (r *APIRouter) handleUpdateGoal(w http.ResponseWriter, req *http.Request) {
 // handleGetGoals handles getting all goals with pagination
 func (r *APIRouter) handleGetGoals(w http.ResponseWriter, req *http.Request) {
 	// Get limit from header
-	limit := 10 // default limit
+	limit := 0 // default limit
 	if limitStr := req.Header.Get("limit"); limitStr != "" {
 		if l, err := strconv.Atoi(limitStr); err == nil && l > 0 {
 			limit = l
@@ -74,7 +74,7 @@ func (r *APIRouter) handleGetGoals(w http.ResponseWriter, req *http.Request) {
 	goals := make(map[string]interface{})
 	for uid, goal := range r.Goals {
 		goals[uid] = goal
-		if len(goals) >= limit {
+		if limit > 0 && len(goals) >= limit {
 			break
 		}
 	}
