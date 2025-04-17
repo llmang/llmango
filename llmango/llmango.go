@@ -53,7 +53,7 @@ type Goal struct {
 	CreatedAt   int      `json:"createdAt"`
 	UpdatedAt   int      `json:"updatedAt"`
 	PromptUIDs  []string `json:"promptUIDs" savestate:"-"` //built during runtime so make sure to not save it in json or database
-	InputOutput[any, any]
+	InputOutput any      `json:"inputOutput"`              //use InputOutput here
 }
 
 type InputOutput[input any, output any] struct {

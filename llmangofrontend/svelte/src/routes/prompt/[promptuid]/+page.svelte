@@ -144,8 +144,8 @@
                         description={goal.description || 'No description'} 
                         href={`${base}/goal/${goal.UID}`}
                     >
-                    <FormatJson jsonText={JSON.stringify(goal.exampleInput || "")} />
-                    <FormatJson jsonText={JSON.stringify(goal.exampleOutput || "")} />
+                    <FormatJson jsonText={JSON.stringify(goal.inputOutput.inputExample || "")} />
+                    <FormatJson jsonText={JSON.stringify(goal.inputOutput.outputExample || "")} />
                     </Card>
                 {:else}
                     <div class="loading-goal">Loading goal information...</div>

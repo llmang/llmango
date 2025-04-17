@@ -12,6 +12,11 @@ import (
 )
 
 func Run[I, R any](l *LLMangoManager, g *Goal, input *I) (*R, error) {
+	inputoutput, ok := g.InputOutput.(*InputOutput[I, R])
+	if !ok || inputoutput == nil {
+		return nil, fmt.Errorf("goal '%s' has invalid or missing InputOutput configuration for types %T -> %T", g.UID, *new(I), *new(R))
+	}
+
 	requestStartTime := float64(time.Now().UnixNano()) / 1e9
 	var res R
 	validPrompts := make(map[string]*Prompt)
@@ -95,7 +100,7 @@ func Run[I, R any](l *LLMangoManager, g *Goal, input *I) (*R, error) {
 		Parameters: selectedPrompt.Parameters,
 	}
 
-	responseFormat, err := openrouter.UseOpenRouterJsonFormat(g.InputOutput.OutputExample, g.Title)
+	responseFormat, err := openrouter.UseOpenRouterJsonFormat(inputoutput.OutputExample, g.Title)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create JSON schema format: %w", err)
 	}

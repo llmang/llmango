@@ -4,9 +4,7 @@ globs:
 alwaysApply: false
 ---
 # Project
-We are converting our alpinejs and templ project Llmango into svelte 
-
-It uses a golang backend
+We use a golang backend
 
 ## tech stack
 Svelte5, global .css files, local scoped svelte css, event handlers used

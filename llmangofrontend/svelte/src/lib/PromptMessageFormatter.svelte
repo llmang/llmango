@@ -38,25 +38,10 @@
     
     // Function to validate if a variable exists in the goal's sampleInput
     function isValidVariable(variable: string): boolean {
-        if (!goal || !goal.exampleInput) return false;
+        if (!goal || !goal.inputOutput?.inputExample) return false;
         
-        // Handle nested properties (e.g., "user.name")
-        const parts = variable.split('.');
-        let current: any = goal.exampleInput;
-        
-        for (const part of parts) {
-            if (current === null || current === undefined || typeof current !== 'object') {
-                return false;
-            }
-            
-            if (!(part in current)) {
-                return false;
-            }
-            
-            current = current[part];
-        }
-        
-        return true;
+        // Only check if the variable exists as a direct key at the first level
+        return variable in goal.inputOutput.inputExample;
     }
     
     // Function to format the message content with highlighted variables and if statements

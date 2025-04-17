@@ -3,7 +3,6 @@ description:
 globs: 
 alwaysApply: true
 ---
-```markdown
 ## Svelte 5 Usage Guide (General)
 
 This guide outlines **Svelte 5–only** patterns, syntax, and best practices. It assumes full usage of **TypeScript** and modern Svelte 5 APIs. It is designed to be copy-pasted into any new Svelte 5 project for onboarding or reference.
@@ -47,7 +46,7 @@ let complex = $derived.by(() => {
 ```
 
 - Automatically tracks dependencies
-- Use `.by()` for more control and readability
+- Use `.by()` for dervies that return for more control or readability
 
 ---
 
@@ -168,4 +167,3 @@ export const myService = new MyService()
 - Maintain clean structure: page-specific vs shared
 
 This reference is for **Svelte 5** only. Do not use syntax from older versions.
-```

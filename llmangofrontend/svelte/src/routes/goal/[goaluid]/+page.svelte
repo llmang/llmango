@@ -58,6 +58,7 @@
             });
             logs = logsResponse?.logs 
             spendResponse = await llmangoLogging.getSpend({goalUID:goaluid})
+            
         } catch (e) {
             error = e instanceof Error ? e.message : 'Failed to load data';
         }finally{
@@ -290,14 +291,20 @@
 
         <h2>Example</h2>
         <div class="examples">
-            <div class="example-panel">
-                <div class="item-title">Input</div>
-                <pre>{JSON.stringify(goal?.exampleInput, null, 2)}</pre>
-            </div>
-            <div class="example-panel">
-                <div class="item-title">Output</div>
-                <pre>{JSON.stringify(goal?.exampleOutput, null, 2)}</pre>
-            </div>
+            <details class="example-panel">
+                <summary>
+                    <div class="item-title">Input Variables</div>
+                    <pre>{Object.keys(goal?.inputOutput?.inputExample || {}).join(', ')}</pre>
+                </summary>
+                <pre>{JSON.stringify(goal?.inputOutput?.inputExample, null, 2)}</pre>
+            </details>
+            <details class="example-panel">
+                <summary>
+                    <div class="item-title">Output Variables</div>
+                    <pre>{Object.keys(goal?.inputOutput?.outputExample || {}).join(', ')}</pre>
+                </summary>
+                <pre>{JSON.stringify(goal?.inputOutput?.outputExample, null, 2)}</pre>
+            </details>
         </div>
 
         <h2>Prompts</h2>

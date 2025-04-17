@@ -19,8 +19,10 @@ export type Goal = {
     prompts: Record<string, string>; // Maps promptUID to promptUID for easy lookup
     title: string;
     description: string;
-    exampleInput: any;
-    exampleOutput: any;
+    inputOutput: { // Changed from exampleInput/exampleOutput directly
+        inputExample: any;
+        outputExample: any;
+    };
 }
 
 export class PromptParameters {
@@ -116,7 +118,11 @@ class LLMangoAPI{
                 throw new Error("Failed to fetch data");
             }
             
-            this.goals = await goalsResponse.json();
+            const goalsData = await goalsResponse.json(); // Fetch goals data first
+            this.goals = goalsData.reduce((acc: Record<string, Goal>, goal: Goal) => { // Reduce into a Record
+                acc[goal.UID] = goal;
+                return acc;
+            }, {});
 
             const promptsData = await promptsResponse.json();
             this.prompts = promptsData.reduce((acc: Record<string, Prompt>, prompt: Prompt) => {
