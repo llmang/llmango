@@ -7,10 +7,9 @@ Goal-driven LLM framework for Go. By [Carson](https://carsho.dev).
 
 ## What It Does
 
-Organizes LLM queries into Goals, Solutions, and Prompts. Focus on outcomes, not prompts.
+Organizes LLM queries into Goals and Prompts. Focus on outcomes, not prompts.
 
 - **Goals**: Define the result.
-- **Solutions**: Ways to get there, with canary testing.
 - **Prompts**: Model-specific inputs.
 
 ## Features
@@ -43,7 +42,9 @@ Variable names are matched against the JSON tags of your input struct fields.
 
 ### Conditional Blocks
 
-Use `{{#if variableName}}...{{/if}}` to include content only when a variable exists and is not empty:
+Use `{{#if variableName}}...{{/if}}` to include content only when a variable exists and is not empty. You can also use `{{:else}}` for an else block.
+
+**Note:** While `{{:else}}` blocks are functional, they haven't been extensively tested.
 
 ```go
 // This section will only appear if previousItems is not empty
@@ -66,6 +67,37 @@ prompt := `
 - Malformed if statements will remain unchanged in the output
 - Unmatched variable names will remain as `{{variableName}}` in the output
 - If statements are processed first, then variable replacements
+- Else statements (`{{:else}}`) are functional but not fully tested.
+
+## Optional Frontend UI Setup
+
+LLMango includes an optional frontend UI for managing Goals and Prompts. To use it:
+
+1.  **Create the Router**: Use `llmangofrontend.CreateLLMMangRouter` to get an `http.Handler`.
+2.  **Mount at `/mango`**: Mount the handler strictly at the `/mango` path prefix. Use `http.StripPrefix` to ensure correct routing.
+3.  **Add Authentication**: **Crucially**, protect this endpoint with your application's authentication middleware (e.g., admin-only access). Exposing this endpoint publicly could grant unauthorized access to your configured LLM providers (like OpenRouter).
+4.  **Disable Caching**: Consider disabling caching for the `/mango` routes to prevent potential information leakage or stale data issues, depending on your authentication and use case.
+
+Example setup using `net/http` compatible router (like `chi` or standard library `http.ServeMux`):
+
+```go
+import (
+	"net/http"
+	"yourapp/middleware" // Replace with your actual middleware import
+	"github.com/llmang/llmango/llmangofrontend"
+)
+
+// Assuming 'app.Mango.LLMangoManager' is your initialized LLMango manager
+// Assuming 'app.AdminDevEnv' is your authentication middleware
+mangoRouter := llmangofrontend.CreateLLMMangRouter(app.Mango.LLMangoManager, nil)
+
+// Ensure router handles paths with and without trailing slash correctly
+router.Handle("/mango", http.StripPrefix("/mango", middleware.AdminDevEnv(mangoRouter)))
+router.Handle("/mango/", http.StripPrefix("/mango", middleware.AdminDevEnv(mangoRouter)))
+
+// Remember to configure cache control headers via middleware if needed
+// e.g., w.Header().Set("Cache-Control", "no-store")
+```
 
 ## Install
 

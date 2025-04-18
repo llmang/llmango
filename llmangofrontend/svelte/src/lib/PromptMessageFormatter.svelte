@@ -18,6 +18,17 @@
     // Track collapsed state of if blocks
     const collapsedBlocks = $state<Record<number, boolean>>({});
     
+    // Function to escape HTML special characters
+    function escapeHtml(unsafe: string): string {
+        if (!unsafe) return '';
+        return unsafe
+             .replace(/&/g, "&amp;")
+             .replace(/</g, "&lt;")
+             .replace(/>/g, "&gt;")
+             .replace(/"/g, "&quot;")
+             .replace(/'/g, "&#039;");
+    }
+    
     // Define types for our blocks
     type TextBlock = {
         type: 'text';
@@ -104,19 +115,41 @@
         return blocks;
     }
     
-    // Format variables in text
-    function formatVariables(text: string) {
-        return text.replace(variablePattern, (match, variableName) => {
-            // If no goal is provided, use a neutral color
-            if (!goal) {
-                return `<span class="neutral-var" title="${variableName}">${match}</span>`;
+    // Format variables in text, escaping non-variable content
+    function formatVariables(text: string): string {
+        let result = '';
+        let lastIndex = 0;
+        variablePattern.lastIndex = 0; // Reset regex state
+        let match;
+
+        while ((match = variablePattern.exec(text)) !== null) {
+            // Escape text *before* the current variable match
+            result += escapeHtml(text.substring(lastIndex, match.index));
+
+            // Process the variable match
+            const variableName = match[1];
+            const fullMatch = match[0]; // e.g., {{varname}}
+            
+            let colorClass = 'neutral-var'; // Default if no goal
+            if (goal) {
+                const isValid = isValidVariable(variableName);
+                colorClass = isValid ? 'valid-var' : 'invalid-var';
             }
             
-            const isValid = isValidVariable(variableName);
-            const colorClass = isValid ? 'valid-var' : 'invalid-var';
-            
-            return `<span class="${colorClass}" title="${variableName}">${match}</span>`;
-        });
+            // Escape the variable name for the title attribute and the matched text for display
+            const escapedVariableName = escapeHtml(variableName);
+            const escapedFullMatch = escapeHtml(fullMatch);
+
+            // Add the styled span (our trusted HTML) around the escaped variable placeholder
+            result += `<span class="${colorClass}" title="${escapedVariableName}">${escapedFullMatch}</span>`;
+
+            lastIndex = match.index + fullMatch.length;
+        }
+
+        // Escape any remaining text *after* the last variable
+        result += escapeHtml(text.substring(lastIndex));
+        
+        return result;
     }
     
     // Toggle collapse state
