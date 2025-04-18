@@ -12,8 +12,8 @@ import (
 )
 
 func Run[I, R any](l *LLMangoManager, g *Goal, input *I) (*R, error) {
-	inputoutput, ok := g.InputOutput.(*InputOutput[I, R])
-	if !ok || inputoutput == nil {
+	inputoutput, ok := g.InputOutput.(InputOutput[I, R])
+	if !ok {
 		return nil, fmt.Errorf("goal '%s' has invalid or missing InputOutput configuration for types %T -> %T", g.UID, *new(I), *new(R))
 	}
 

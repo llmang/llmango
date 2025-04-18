@@ -1,10 +1,11 @@
 <script lang="ts">
     import Modal from './Modal.svelte';
-    import type { Prompt, Goal } from './classes/llmangoAPI.svelte';
+    import type { Prompt } from './classes/llmangoAPI.svelte';
     import { llmangoAPI, PromptParameters } from './classes/llmangoAPI.svelte';
     import { openrouter, type OpenRouterModel } from './classes/openrouter.svelte';
     import { onMount } from 'svelte';
     import PromptMessageFormatter from './PromptMessageFormatter.svelte';
+    import InfoTooltip from './InfoTooltip.svelte';
 
     // Props definition using Svelte 5 syntax
     let { 
@@ -25,7 +26,6 @@
 
     // Determine if we're creating a new prompt or editing an existing one
     const isNewPrompt = $derived(!prompt || !!prefillData);
-    const initialData = $derived(prompt || prefillData);
     let goal = $derived(llmangoAPI.goals[prompt?.goalUID || goalUID] || null);
     
     // Form state
@@ -49,28 +49,34 @@
     let uidError = $state<string | null>(null);
     
     // Goal state
-    let goalData = $state<Goal | null>(null);
     let goalLoading = $state(false);
 
     // Initialize the form with existing prompt data if editing, or prefill data if provided
     $effect(() => {
-        if (initialData) {
-            formData = { ...initialData };
-            if (prefillData) {
-                formData.UID = '';
-                formData.totalRuns = 0;
-            }
-            if (!formData.messages || formData.messages.length === 0) {
-                formData.messages = [{ role: 'user', content: '' }];
-            }
+        const dataToUse = prompt || prefillData;
+        if (dataToUse) {
+            // Update properties individually instead of replacing the object
+            formData.UID = prefillData ? '' : dataToUse.UID || '';
+            formData.goalUID = dataToUse.goalUID || goalUID; // Ensure goalUID is set
+            formData.model = dataToUse.model || '';
+            // Ensure parameters is a class instance, deep copy messages
+            formData.parameters = new PromptParameters(dataToUse.parameters); 
+            formData.messages = (dataToUse.messages && dataToUse.messages.length > 0)
+                ? JSON.parse(JSON.stringify(dataToUse.messages)) // Deep copy needed
+                : [{ role: 'user', content: '' }];
+            formData.weight = dataToUse.weight ?? 1; // Use nullish coalescing for default
+            formData.isCanary = dataToUse.isCanary ?? false; // Use nullish coalescing for default
+            formData.maxRuns = dataToUse.maxRuns ?? 0; // Use nullish coalescing for default
+            formData.totalRuns = prefillData ? 0 : dataToUse.totalRuns || 0;
         } else {
-            formData.goalUID = goal.UID;
+            // Reset to defaults for a completely new prompt (no initial data)
             formData.UID = '';
+            formData.goalUID = goal?.UID || goalUID; // Use optional chaining and fallback
             formData.model = '';
             formData.parameters = new PromptParameters();
             formData.messages = [{ role: 'user', content: '' }];
             formData.weight = 1;
-            formData.isCanary = false;
+            formData.isCanary = false; // Explicitly set to false
             formData.maxRuns = 0;
             formData.totalRuns = 0;
         }
@@ -206,76 +212,81 @@
             <div class="error-message">{error}</div>
         {/if}
 
+        <!-- UID Field -->
+        {#if isNewPrompt}
+            <label for="uid" class="section-label">
+                <span class="titles-secondary">UID</span>
+                {#if uidError}
+                    <small class="label-info error-text">{uidError}</small>
+                {:else}
+                    <small class="label-info">Unique identifier (URL-safe characters only){#if prefillData} - must be different from original{/if}</small>
+                {/if}
+            </label>
+            <input 
+                type="text" 
+                id="uid" 
+                bind:value={formData.UID} 
+                class="form-control styled-input"
+                required
+            />
+        {/if}
+
         <form onsubmit={(e) => { e.preventDefault(); handleSubmit(); }}>
-            <div class="form-group">
-                <label for="weight">Weight</label>
-                <input 
-                    type="number" 
-                    id="weight" 
-                    bind:value={formData.weight} 
-                    min="0"
-                    step="0.1"
-                    class="form-control"
-                />
-                <small>Higher weight means this prompt will be used more often</small>
-            </div>
-            <!-- Canary Options Section (now first) -->
-            <div class="canary-section">
-                <h3>Canary Testing</h3>
-                <div class="form-group">
+            <!-- Weight Field -->
+            <label for="weight" class="section-label">
+                 <span class="titles-secondary">Weight</span>
+                 <small class="label-info">Higher weight means this prompt will be used more often</small>
+            </label>
+            <input 
+                 type="number" 
+                 id="weight" 
+                 bind:value={formData.weight} 
+                 min="0"
+                 step="0.1"
+                 class="form-control styled-input"
+            />
+             
+            <div class="section-title">
+                  <span class="titles-secondary">Canary Testing</span>
+             </div>
+            <div class="section-content"> 
+                <div class="canary-options"> 
                     <label class="checkbox-label">
                         <input 
                             type="checkbox" 
                             bind:checked={formData.isCanary} 
                         />
-                        Use as canary test
+                        <span class="titles-secondary">Use as canary test</span>
+                        <small class="label-info">(Used for testing and monitoring)</small>
                     </label>
-                    <small>Canary prompts are used for testing and monitoring</small>
-                </div>
-
-                {#if formData.isCanary}
-                    <div class="form-group">
-                        <label for="maxRuns">Max Runs</label>
+                     
+                     {#if formData.isCanary}
+                        <label for="maxRuns" class="section-label inner-label">Max Runs</label>
                         <input 
                             type="number" 
                             id="maxRuns" 
                             bind:value={formData.maxRuns} 
                             min="0"
-                            class="form-control"
+                            class="form-control styled-input inner-input"
                         />
-                    </div>
-                {/if}
-            </div>
-
-            <!-- Only show these sections if in new prompt mode -->
-            {#if isNewPrompt}
-                <!-- UID Field -->
-                <div class="form-group">
-                    <label for="uid">UID</label>
-                    <input 
-                        type="text" 
-                        id="uid" 
-                        bind:value={formData.UID} 
-                        class="form-control"
-                        required
-                    />
-                    {#if uidError}
-                        <small class="error-text">{uidError}</small>
-                    {:else}
-                        <small>Unique identifier (URL-safe characters only){#if prefillData} - must be different from original{/if}</small>
-                    {/if}
+                     {/if}
                 </div>
+            </div>
+            <hr/>
 
+            {#if isNewPrompt}
                 <!-- Model Selection -->
-                <div class="form-group">
-                    <label for="model">Default Model</label>
+                <label for="model" class="section-label">
+                    <span class="titles-secondary">Default Model</span>
+                </label>
+                <div class="select-wrapper"> 
                     {#if modelsLoading}
-                        <div class="form-control loading-placeholder">Loading models...</div>
+                        <div class="styled-input loading-placeholder">Loading models...</div>
                     {:else}
                         <select 
                             id="model" 
                             bind:value={formData.model} 
-                            class="form-control"
+                            class="form-control styled-input"
                             required
                         >
                             <option value="">Select a model</option>
@@ -287,13 +298,18 @@
                 </div>
 
                 <!-- Parameters -->
-                <div class="form-group parameters-section">
-                    <h3>Parameters</h3>
+                <div class="section-title">
+                        <span class="titles-secondary">Parameters</span>
+                </div>
+                <div class="section-content"> 
                     <details class="advanced-params">
-                        <summary>Show parameters</summary>
+                        <summary><span class="titles-secondary">Show parameters</span></summary>
                         <div class="parameter-grid">
                             <div class="parameter-item">
-                                <label for="temperature">Temperature</label>
+                                <label for="temperature" class="inner-label">
+                                    <span class="titles-secondary">Temperature</span> <span class="label-info">(Default: 1.0, Range: 0.0-2.0)</span>
+                                    <InfoTooltip text="Influences the variety in responses. Lower values are more predictable, higher values more diverse. 0 is deterministic." />
+                                </label>
                                 <input 
                                     type="number" 
                                     id="temperature" 
@@ -301,23 +317,29 @@
                                     min="0" 
                                     max="2" 
                                     step="0.1" 
-                                    class="form-control"
+                                    class="form-control styled-input inner-input"
                                 />
                             </div>
                             
                             <div class="parameter-item">
-                                <label for="max_tokens">Max Tokens</label>
+                                <label for="max_tokens" class="inner-label">
+                                    <span class="titles-secondary">Max Tokens</span> <span class="label-info">(Default: N/A, Range: 1+)</span>
+                                    <InfoTooltip text="Sets the maximum number of tokens the model can generate. Max value is context length minus prompt length." />
+                                </label>
                                 <input 
                                     type="number" 
                                     id="max_tokens" 
                                     bind:value={formData.parameters.max_tokens} 
                                     min="1" 
-                                    class="form-control"
+                                    class="form-control styled-input inner-input"
                                 />
                             </div>
                             
                             <div class="parameter-item">
-                                <label for="top_p">Top P</label>
+                                <label for="top_p" class="inner-label">
+                                    <span class="titles-secondary">Top P</span> <span class="label-info">(Default: 1.0, Range: 0.0-1.0)</span>
+                                    <InfoTooltip text="Limits choices to a percentage of likely tokens. Lower values make responses more predictable." />
+                                </label>
                                 <input 
                                     type="number" 
                                     id="top_p" 
@@ -325,12 +347,15 @@
                                     min="0" 
                                     max="1" 
                                     step="0.01" 
-                                    class="form-control"
+                                    class="form-control styled-input inner-input"
                                 />
                             </div>
                             
                             <div class="parameter-item">
-                                <label for="frequency_penalty">Frequency Penalty</label>
+                                <label for="frequency_penalty" class="inner-label">
+                                    <span class="titles-secondary">Frequency Penalty</span> <span class="label-info">(Default: 0.0, Range: -2.0-2.0)</span>
+                                    <InfoTooltip text="Controls token repetition based on input frequency. Higher values reduce repetition of frequent tokens. Negative values encourage reuse." />
+                                </label>
                                 <input 
                                     type="number" 
                                     id="frequency_penalty" 
@@ -338,12 +363,15 @@
                                     min="-2" 
                                     max="2" 
                                     step="0.1" 
-                                    class="form-control"
+                                    class="form-control styled-input inner-input"
                                 />
                             </div>
                             
                             <div class="parameter-item">
-                                <label for="presence_penalty">Presence Penalty</label>
+                                <label for="presence_penalty" class="inner-label">
+                                    <span class="titles-secondary">Presence Penalty</span> <span class="label-info">(Default: 0.0, Range: -2.0-2.0)</span>
+                                    <InfoTooltip text="Adjusts repetition of tokens already used in input. Higher values make repetition less likely. Negative values encourage reuse." />
+                                </label>
                                 <input 
                                     type="number" 
                                     id="presence_penalty" 
@@ -351,117 +379,113 @@
                                     min="-2" 
                                     max="2" 
                                     step="0.1" 
-                                    class="form-control"
+                                    class="form-control styled-input inner-input"
                                 />
                             </div>
                         </div>
                     </details>
                 </div>
-                
-                <!-- Goal Variables -->
-                {#if goal}
-                    <div class="form-group">
-                        <label>Goal Variables</label>
-                        {#if goalLoading}
-                            <div class="loading-placeholder">Loading goal data...</div>
-                        {:else if goal && goal.exampleInput}
-                            <div class="goal-variables">
-                                <h4>Example Input for {goal.title || 'Goal'}</h4>
-                                <div class="example-input">
-                                    {#each Object.keys(goal.exampleInput) as key}
-                                        <code class="variable-key">{`{{${key}}}`}</code>
-                                    {/each}
-                                </div>
-                                <p class="variables-help">You can use these variables in your messages with the syntax <code>{"{{variableName}}"}</code></p>
-                            </div>
-                        {:else}
-                            <div class="loading-placeholder">No example input available for this goal</div>
-                        {/if}
-                    </div>
-                {/if}
+            <hr/>
             {/if}
-
-            <!-- Messages Section -->
-            <div class="form-group messages-section">
-                <div class="messages-header">
-                    <h3>Messages</h3>
-                    {#if isNewPrompt}
-                        <div class="message-controls">
-                            <button type="button" class="btn btn-sm" onclick={() => addMessage('system')}>Add System</button>
-                            <button type="button" class="btn btn-sm" onclick={() => addMessage('user')}>Add User</button>
-                            <button type="button" class="btn btn-sm" onclick={() => addMessage('assistant')}>Add Assistant</button>
+            <!-- Goal Variables -->
+            {#if goal}
+                <div class="section-title">
+                        <span class="titles-secondary">Goal Variables</span>
+                        <small class="label-info">You can use these variables in your messages with the syntax <code>{"{{variableName}}}}"}</code></small>
+                </div>
+                <div class="section-content"> 
+                    {#if goalLoading}
+                        <div class="loading-placeholder">Loading...</div>
+                    {:else if goal && goal.inputOutput.inputExample && Object.keys(goal.inputOutput.inputExample).length > 0}
+                        <div class="variables-list">
+                            {#each Object.keys(goal.inputOutput.inputExample) as key}
+                                <code class="variable-key">{`{{${key}}}`}</code>
+                            {/each}
                         </div>
+                    {:else}
+                            <div class="loading-placeholder">No input variables defined for this goal.</div>
                     {/if}
                 </div>
-                
-                <div class="messages-list">
-                    {#each formData.messages as message, i}
-                        <label class="message-card" for={`message-textarea-${i}`}>
-                            <div class="message-type-header">
-                                <span class="message-type {message.role}">
-                                    {message.role.charAt(0).toUpperCase() + message.role.slice(1)}
-                                </span>
-                            </div>
-                            
-                            {#if isNewPrompt}
-                                <textarea 
-                                    id={`message-textarea-${i}`}
-                                    class="message-textarea" 
-                                    placeholder={`Enter ${message.role} message...`}
-                                    bind:value={message.content}
-                                    rows="4"
-                                    required
-                                ></textarea>
-                            {/if}
-                            
-                            <div class="preview">
-                                <span class="preview-label">Preview</span>
-                                <div class="preview-content">
-                                    <PromptMessageFormatter message={message.content} {goal} />
-                                </div>
-                            </div>
-                            
-                            {#if isNewPrompt}
-                                <div class="message-controls-bar">
-                                    <button 
-                                        type="button" 
-                                        class="btn-icon" 
-                                        onclick={(e) => { e.preventDefault(); moveMessageUp(i); }}
-                                        disabled={i === 0}
-                                        title="Move up"
-                                    >
-                                        ↑
-                                    </button>
-                                    <button 
-                                        type="button" 
-                                        class="btn-icon" 
-                                        onclick={(e) => { e.preventDefault(); moveMessageDown(i); }}
-                                        disabled={i === formData.messages.length - 1}
-                                        title="Move down"
-                                    >
-                                        ↓
-                                    </button>
-                                    <button 
-                                        type="button" 
-                                        class="btn-icon btn-danger" 
-                                        onclick={(e) => { e.preventDefault(); removeMessage(i); }}
-                                        title="Remove"
-                                    >
-                                        ×
-                                    </button>
-                                </div>
-                            {/if}
-                        </label>
-                    {/each}
-                </div>
-            </div>
+            {/if}
+            <!-- Messages Section -->
+            <div class="section-title">
+                 <span class="titles-secondary">Messages</span>
+             </div>
+             
+             <div class="section-content messages-list"> 
+                 {#if isNewPrompt}
+                     <div class="message-controls top-controls">
+                         <button type="button" class="btn btn-sm" onclick={() => addMessage('system')}>Add System</button>
+                         <button type="button" class="btn btn-sm" onclick={() => addMessage('user')}>Add User</button>
+                         <button type="button" class="btn btn-sm" onclick={() => addMessage('assistant')}>Add Assistant</button>
+                     </div>
+                 {/if}
+                 {#each formData.messages as message, i}
+                     <label class="message-card" for={`message-textarea-${i}`}>
+                         <div class="message-type-header">
+                             <span class="message-type {message.role}">
+                                 {message.role.charAt(0).toUpperCase() + message.role.slice(1)}
+                             </span>
+                         </div>
+                         
+                         {#if isNewPrompt}
+                             <textarea 
+                                 id={`message-textarea-${i}`}
+                                 class="message-textarea" 
+                                 placeholder={`Enter ${message.role} message...`}
+                                 bind:value={message.content}
+                                 rows="4"
+                                 required
+                             ></textarea>
+                         {/if}
+                         
+                         <div class="preview">
+                             <span class="preview-label">Preview</span>
+                             <div class="preview-content">
+                                 <PromptMessageFormatter message={message.content} {goal} />
+                             </div>
+                         </div>
+                         
+                         {#if isNewPrompt}
+                             <div class="message-controls-bar">
+                                 <button 
+                                     type="button" 
+                                     class="btn-icon" 
+                                     onclick={(e) => { e.preventDefault(); moveMessageUp(i); }}
+                                     disabled={i === 0}
+                                     title="Move up"
+                                 >
+                                     ↑
+                                 </button>
+                                 <button 
+                                     type="button" 
+                                     class="btn-icon" 
+                                     onclick={(e) => { e.preventDefault(); moveMessageDown(i); }}
+                                     disabled={i === formData.messages.length - 1}
+                                     title="Move down"
+                                 >
+                                     ↓
+                                 </button>
+                                 <button 
+                                     type="button" 
+                                     class="btn-icon btn-danger" 
+                                     onclick={(e) => { e.preventDefault(); removeMessage(i); }}
+                                     title="Remove"
+                                 >
+                                     ×
+                                 </button>
+                             </div>
+                         {/if}
+                     </label>
+                 {/each}
+             </div>
 
-            <div class="form-actions">
-                <button type="button" class="btn btn-secondary" onclick={onClose}>Cancel</button>
-                <button type="submit" class="btn btn-primary" disabled={isSubmitting}>
-                    {isSubmitting ? 'Saving...' : isNewPrompt ? 'Create' : 'Update'}
-                </button>
-            </div>
+             <div class="form-actions">
+                 <button type="button" class="btn btn-secondary" onclick={onClose}>Cancel</button>
+                 <button type="submit" class="btn btn-primary" disabled={isSubmitting}>
+                     {isSubmitting ? 'Saving...' : isNewPrompt ? 'Create' : 'Update'}
+                 </button>
+             </div>
         </form>
     </div>
 </Modal>
@@ -473,7 +497,7 @@
 
     }
     .prompt-modal {
-       width: 60rem;
+       width: 45rem;
        max-width: 100%;
     }
     
@@ -485,19 +509,29 @@
         border-radius: 4px;
     }
     
-    .form-group {
-        margin-bottom: 1rem;
-    }
-    
-    .form-control {
+    .form-control,
+    .styled-input,
+    .section-content {
         display: block;
         width: 100%;
-        padding: 0.5rem;
         font-size: 1rem;
-        border: 1px solid #ced4da;
+        border: none;
         border-radius: 0.25rem;
+        background-color: rgba(128, 128, 128, 0.075);
+        margin-bottom: 2rem;
+        transition: border-color .15s ease-in-out,box-shadow .15s ease-in-out;
+    }
+    .section-content{
+        padding:1rem;
     }
     
+    .form-control:focus,
+    .styled-input:focus,
+    .message-textarea:focus {
+        outline: 0;
+        box-shadow: 0 0 0 0.2rem rgba(0,123,255,.25);
+    }
+      
     .form-control:disabled {
         background-color: #e9ecef;
         cursor: not-allowed;
@@ -517,12 +551,13 @@
         gap: 0.5rem;
     }
     
-    small {
-        display: block;
+    .label-info {
         color: #6c757d;
-        margin-top: 0.25rem;
+        font-size: 0.8rem;
+        margin-left: 0.5rem;
+        font-weight: normal;
+        margin-top: 0;
     }
-    
     .error-text {
         color: #dc3545;
     }
@@ -554,7 +589,6 @@
         display: flex;
         justify-content: space-between;
         align-items: center;
-        margin-bottom: 1rem;
     }
     
     .message-controls {
@@ -729,16 +763,30 @@
         cursor: not-allowed;
     }
     
-    .goal-variables {
-        background-color: #f8f9fa;
-        border-radius: 3px;
-        padding: 0.75rem;
+    
+    .goal-variables-section {
+        margin-top: 1.5rem;
     }
     
-    .goal-variables h4 {
-        margin-top: 0;
+    .section-title,
+    .section-label {
         margin-bottom: 0.5rem;
-        font-size: 0.9rem;
+        margin-top: 0;
+        display: block;
+        font-weight: 600;
+    }
+    
+    .variables-list {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.5rem;
+        font-size: 0.85rem;
+    }
+    
+    .section-content .loading-placeholder {
+        background-color: #f8f9fa;
+        padding: 0.75rem;
+        border-radius: 3px;
     }
     
     .example-input {
@@ -753,12 +801,6 @@
         max-height: 150px;
     }
     
-    .variables-help {
-        font-size: 0.75rem;
-        color: #555;
-        margin: 0.5rem 0 0;
-    }
-    
     .variables-info {
         background-color: #f5f5f5;
         padding: 0.5rem;
@@ -766,18 +808,21 @@
         margin-bottom: 1rem;
         font-size: 0.75rem;
     }
-    
 
-    h3{
-        margin-top:0;
-        }
-    /* Add this new style for the canary section */
     .canary-section {
-
-        background: #f8f9fa;
-        padding: 1rem;
         border-radius: 4px;
-        margin-bottom: 1.5rem;
-        border: 1px solid #e9ecef;
     }
+
+    .section-content .styled-input.inner-input {
+        margin-bottom: 0;
+    }
+    .inner-label {
+        margin-bottom: 0.25rem;
+        display: block;
+    }
+
+    .top-controls {
+        margin-bottom: 1rem; 
+    }
+
 </style> 

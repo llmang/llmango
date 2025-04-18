@@ -14,8 +14,6 @@
     import PromptModal from '$lib/PromptModal.svelte';
 
 
-
-
     let promptuid: string = $derived(page.params.promptuid);
     let prompt: Prompt | null = $derived(llmangoAPI.prompts[promptuid] || null);
     let goal: Goal | null = $derived(llmangoAPI.goals[prompt?.goalUID] || null);
