@@ -5,6 +5,7 @@ import (
 	"slices"
 	"time"
 
+	"github.com/carsongh/strongmap/concurrentmap"
 	"github.com/llmang/llmango/openrouter"
 )
 
@@ -15,8 +16,8 @@ var BASE_BACKOFF_DELAY = 100 * time.Millisecond
 type LLMangoManager struct {
 	RetryRateLimit bool
 	OpenRouter     *openrouter.OpenRouter
-	Goals          SyncedMap[string, *Goal]
-	Prompts        SyncedMap[string, *Prompt]
+	Goals          concurrentmap.SyncedMap[string, *Goal]
+	Prompts        concurrentmap.SyncedMap[string, *Prompt]
 	SaveState      func() error
 	Logging        *Logging
 }
@@ -25,8 +26,8 @@ func CreateLLMangoManger(o *openrouter.OpenRouter) (*LLMangoManager, error) {
 	// defaultFileName := "llmango.json"
 	return &LLMangoManager{
 		OpenRouter: o,
-		Prompts:    SyncedMap[string, *Prompt]{},
-		Goals:      SyncedMap[string, *Goal]{},
+		Prompts:    concurrentmap.SyncedMap[string, *Prompt]{},
+		Goals:      concurrentmap.SyncedMap[string, *Goal]{},
 	}, nil
 }
 
@@ -90,17 +91,17 @@ func (m *LLMangoManager) AddOrUpdateGoals(goals ...*Goal) {
 			if goal.UpdatedAt == 0 {
 				goal.UpdatedAt = now
 			}
-			if m.Goals.Exists(goal.UID) {
-				existingGoal := m.Goals.Get(goal.UID)
+			if existingGoal, ok := m.Goals.Get(goal.UID); ok {
 				existingGoal.Title = goal.Title
 				existingGoal.Description = goal.Description
-				existingGoal.CreatedAt = goal.CreatedAt
-				existingGoal.UpdatedAt = goal.UpdatedAt
+				existingGoal.CreatedAt = goal.CreatedAt // Keep original CreatedAt? No, instruction implies updating based on input goal.
+				existingGoal.UpdatedAt = goal.UpdatedAt // Update UpdatedAt based on input goal.
 				m.Goals.Set(goal.UID, existingGoal)
 			} else {
 				goal.PromptUIDs = []string{}
 				m.Goals.Set(goal.UID, goal)
-				for _, prompt := range m.Prompts.m {
+				// Iterate over a snapshot for thread safety
+				for _, prompt := range m.Prompts.Snapshot() {
 					if prompt != nil && prompt.GoalUID == goal.UID {
 						goal.PromptUIDs = append(goal.PromptUIDs, prompt.UID)
 					}
@@ -125,7 +126,8 @@ func (m *LLMangoManager) AddGoals(goals ...*Goal) {
 			}
 			goal.PromptUIDs = []string{}
 			m.Goals.Set(goal.UID, goal)
-			for _, prompt := range m.Prompts.m {
+			// Iterate over a snapshot for thread safety
+			for _, prompt := range m.Prompts.Snapshot() {
 				if prompt != nil && prompt.GoalUID == goal.UID {
 					goal.PromptUIDs = append(goal.PromptUIDs, prompt.UID)
 				}
@@ -148,12 +150,15 @@ func (m *LLMangoManager) AddPrompts(prompts ...*Prompt) {
 				prompt.UpdatedAt = now
 			}
 			m.Prompts.Set(prompt.UID, prompt)
-			if prompt.GoalUID != "" && m.Goals.Exists(prompt.GoalUID) {
-				goal := m.Goals.Get(prompt.GoalUID)
-				found := slices.Contains(goal.PromptUIDs, prompt.UID)
-				if !found {
-					goal.PromptUIDs = append(goal.PromptUIDs, prompt.UID)
-					m.Goals.Set(goal.UID, goal)
+			if prompt.GoalUID != "" {
+				// Get now returns item, ok
+				goal, ok := m.Goals.Get(prompt.GoalUID)
+				if ok { // Check if the goal exists
+					found := slices.Contains(goal.PromptUIDs, prompt.UID)
+					if !found {
+						goal.PromptUIDs = append(goal.PromptUIDs, prompt.UID)
+						m.Goals.Set(goal.UID, goal) // Update the goal
+					}
 				}
 			}
 		}

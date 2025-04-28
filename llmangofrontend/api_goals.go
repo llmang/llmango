@@ -26,12 +26,12 @@ func (r *APIRouter) handleUpdateGoal(w http.ResponseWriter, req *http.Request) {
 	}
 
 	// Check existence and get the goal from the manager's map
-	if !r.LLMangoManager.Goals.Exists(goalUID) {
+	goal, ok := r.LLMangoManager.Goals.Get(goalUID)
+	if !ok {
 		w.WriteHeader(http.StatusNotFound)
 		w.Write([]byte("Goal not found"))
 		return
 	}
-	goal := r.LLMangoManager.Goals.Get(goalUID)
 
 	var updateReq struct {
 		Title       *string `json:"title,omitempty"` // Use pointers to check presence
@@ -90,8 +90,8 @@ func (r *APIRouter) handleGetGoals(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	// Get all goals using GetAll
-	allGoalsMap := r.LLMangoManager.Goals.GetAll()
+	// Get all goals using Snapshot for safe iteration
+	allGoalsMap := r.LLMangoManager.Goals.Snapshot()
 
 	// Convert map to slice for sorting
 	goalsSlice := make([]*llmango.Goal, 0, len(allGoalsMap))
@@ -139,12 +139,12 @@ func (r *APIRouter) handleGetGoal(w http.ResponseWriter, req *http.Request) {
 	}
 
 	// Use Exists() and Get() on the manager's map
-	if !r.LLMangoManager.Goals.Exists(goalUID) {
+	goal, ok := r.LLMangoManager.Goals.Get(goalUID)
+	if !ok {
 		w.WriteHeader(http.StatusNotFound)
 		w.Write([]byte("Goal not found"))
 		return
 	}
-	goal := r.LLMangoManager.Goals.Get(goalUID)
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(goal)

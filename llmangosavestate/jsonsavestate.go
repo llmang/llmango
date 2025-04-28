@@ -36,7 +36,7 @@ func jsonSaveStateFunc(mango *llmango.LLMangoManager, fileName string) error {
 
 	// Populate Goals for saving
 	// Corrected: Iterate over items retrieved using GetAll() AND removed Input/Output Examples
-	for uid, goal := range mango.Goals.GetAll() {
+	for uid, goal := range mango.Goals.Snapshot() {
 		if goal == nil {
 			continue // skip nil entries if any
 		}
@@ -51,7 +51,7 @@ func jsonSaveStateFunc(mango *llmango.LLMangoManager, fileName string) error {
 	}
 
 	// Populate Prompts for saving
-	for uid, prompt := range mango.Prompts.GetAll() {
+	for uid, prompt := range mango.Prompts.Snapshot() {
 		if prompt == nil {
 			continue // skip nil entries if any
 		}

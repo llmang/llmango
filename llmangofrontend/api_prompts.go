@@ -25,8 +25,8 @@ func (r *APIRouter) handleGetPrompts(w http.ResponseWriter, req *http.Request) {
 		}
 	}
 
-	// Get all prompts from the SyncedMap using GetAll
-	allPromptsMap := r.Prompts.GetAll()
+	// Get all prompts from the SyncedMap using Snapshot for safe iteration
+	allPromptsMap := r.Prompts.Snapshot()
 
 	// Convert map to slice for sorting
 	prompts := make([]*llmango.Prompt, 0, len(allPromptsMap))
@@ -63,13 +63,13 @@ func (r *APIRouter) handleGetPrompt(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	// Use Exists() and Get() methods on r.Prompts
-	if !r.Prompts.Exists(promptUID) {
+	// Use Get() method on r.Prompts, checking the 'ok' return value
+	prompt, ok := r.Prompts.Get(promptUID)
+	if !ok {
 		w.WriteHeader(http.StatusNotFound)
 		w.Write([]byte("Prompt not found"))
 		return
 	}
-	prompt := r.Prompts.Get(promptUID)
 
 	json.NewEncoder(w).Encode(prompt)
 }
@@ -96,29 +96,29 @@ func (r *APIRouter) handleDeletePrompt(w http.ResponseWriter, req *http.Request)
 		return
 	}
 
-	// Check if prompt exists using Exists() on the manager's map
-	if !r.LLMangoManager.Prompts.Exists(promptUID) {
-		w.WriteHeader(http.StatusNotFound)
-		w.Write([]byte("Prompt not found"))
+	// Get the prompt before deleting to find its GoalUID, checking 'ok'
+	promptToDelete, ok := r.LLMangoManager.Prompts.Get(promptUID)
+	if !ok {
+		w.WriteHeader(http.StatusInternalServerError) // Or NotFound, depends on expected state
+		w.Write([]byte("Prompt existed but failed to retrieve before delete"))
 		return
 	}
-
-	// Get the prompt before deleting to find its GoalUID
-	promptToDelete := r.LLMangoManager.Prompts.Get(promptUID)
 	goalUID := promptToDelete.GoalUID
 
 	// Delete the prompt using Delete() on the manager's map
 	r.LLMangoManager.Prompts.Delete(promptUID)
 
 	// Remove the prompt UID from the corresponding goal's PromptUIDs list in the manager's map
-	if goalUID != "" && r.LLMangoManager.Goals.Exists(goalUID) {
-		goal := r.LLMangoManager.Goals.Get(goalUID)
-		newPromptUIDs := slices.DeleteFunc(goal.PromptUIDs, func(uid string) bool {
-			return uid == promptUID
-		})
-		if len(newPromptUIDs) < len(goal.PromptUIDs) { // Check if deletion happened
-			goal.PromptUIDs = newPromptUIDs
-			r.LLMangoManager.Goals.Set(goalUID, goal) // Update the goal in the SyncedMap
+	if goalUID != "" {
+		goal, ok := r.LLMangoManager.Goals.Get(goalUID)
+		if ok { // Only proceed if goal exists
+			newPromptUIDs := slices.DeleteFunc(goal.PromptUIDs, func(uid string) bool {
+				return uid == promptUID
+			})
+			if len(newPromptUIDs) < len(goal.PromptUIDs) { // Check if deletion happened
+				goal.PromptUIDs = newPromptUIDs
+				r.LLMangoManager.Goals.Set(goalUID, goal) // Update the goal in the SyncedMap
+			}
 		}
 	}
 
@@ -187,10 +187,16 @@ func (r *APIRouter) handleCreatePrompt(w http.ResponseWriter, req *http.Request)
 	r.LLMangoManager.Prompts.Set(prompt.UID, prompt)
 
 	// Add the prompt UID to the corresponding goal's PromptUIDs list
-	goal := r.LLMangoManager.Goals.Get(prompt.GoalUID)
-	if !slices.Contains(goal.PromptUIDs, prompt.UID) {
-		goal.PromptUIDs = append(goal.PromptUIDs, prompt.UID)
-		r.LLMangoManager.Goals.Set(goal.UID, goal) // Update the goal
+	goal, ok := r.LLMangoManager.Goals.Get(prompt.GoalUID)
+	if ok { // Check if goal exists
+		if !slices.Contains(goal.PromptUIDs, prompt.UID) {
+			goal.PromptUIDs = append(goal.PromptUIDs, prompt.UID)
+			r.LLMangoManager.Goals.Set(goal.UID, goal) // Update the goal
+		}
+	} else {
+		// This case should ideally not happen due to the check earlier,
+		// but log it if it does.
+		log.Printf("WARN: Goal %s not found when trying to add prompt %s", prompt.GoalUID, prompt.UID)
 	}
 
 	// Save state after creating the prompt and updating the goal
@@ -220,13 +226,13 @@ func (r *APIRouter) handleUpdatePrompt(w http.ResponseWriter, req *http.Request)
 		return
 	}
 
-	// Check existence and get the prompt from the manager's map
-	if !r.LLMangoManager.Prompts.Exists(promptUID) {
+	// Check existence and get the prompt from the manager's map, checking 'ok'
+	prompt, ok := r.LLMangoManager.Prompts.Get(promptUID)
+	if !ok {
 		w.WriteHeader(http.StatusNotFound)
 		w.Write([]byte("Prompt not found"))
 		return
 	}
-	prompt := r.LLMangoManager.Prompts.Get(promptUID)
 
 	// Parse request body - use pointers to check for field presence
 	var updateReq struct {

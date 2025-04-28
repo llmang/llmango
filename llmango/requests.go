@@ -27,8 +27,8 @@ func Run[I, R any](l *LLMangoManager, g *Goal, input *I) (*R, error) {
 			log.Printf("WARN: prompt %s not found in manager, skipping.", promptUID)
 			continue
 		}
-		prompt := l.Prompts.Get(promptUID)
-		if prompt == nil {
+		prompt, ok := l.Prompts.Get(promptUID)
+		if !ok || prompt == nil {
 			continue
 		}
 
@@ -50,8 +50,8 @@ func Run[I, R any](l *LLMangoManager, g *Goal, input *I) (*R, error) {
 		hasBasePrompt := false
 		for _, pUID := range g.PromptUIDs {
 			if l.Prompts.Exists(pUID) {
-				p := l.Prompts.Get(pUID)
-				if p != nil && !p.IsCanary {
+				p, ok := l.Prompts.Get(pUID)
+				if ok && p != nil && !p.IsCanary {
 					hasBasePrompt = true
 					break
 				}
