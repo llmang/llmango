@@ -1,4 +1,7 @@
 # LLMang
+
+WARNING: this is a WIP, I do not recommend using this at this stage!!!
+
 [llmang.com](https://llmang.com)
 
 Hardcode Goals, Not Prompts
