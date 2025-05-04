@@ -7,4 +7,4 @@ require (
 	github.com/mattn/go-sqlite3 v1.14.28
 )
 
-require github.com/carsongh/strongmap v0.0.0-20250501020245-3d9fa80f1bb0 // indirect
+require github.com/carsongh/strongmap v0.0.0-20250501020245-3d9fa80f1bb0
