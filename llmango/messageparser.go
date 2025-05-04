@@ -1,6 +1,7 @@
 package llmango
 
 import (
+	"encoding/json"
 	"fmt"
 	"reflect"
 	"regexp"
@@ -8,6 +9,12 @@ import (
 
 	"github.com/llmang/llmango/openrouter"
 )
+
+// ArbitraryMessage represents a simple message structure used for parsing insertMessages
+type ArbitraryMessage struct {
+	Role    string `json:"role"`
+	Content string `json:"content"`
+}
 
 // ParseMessageIfStatements processes conditional blocks in messages.
 // It handles {{#if varName}}...{{/if}} blocks, keeping content if varName is not empty.
@@ -110,16 +117,8 @@ func ParseMessageIfStatements(input any, messages []openrouter.Message) ([]openr
 	return copiedMessages, nil
 }
 
-func InsertVariableValuesIntoPromptMessagesCopy(input any, messages []openrouter.Message) ([]openrouter.Message, error) {
-	// Create a deep copy of messages to avoid modifying original
-	copiedMessages := make([]openrouter.Message, len(messages))
-	for i, msg := range messages {
-		copiedMessages[i] = openrouter.Message{
-			Role:    msg.Role,
-			Content: msg.Content,
-		}
-	}
-
+// InsertVariableValue inserts a single variable value into content
+func InsertVariableValue(input any, varName string, content string) (string, error) {
 	// Convert input to map of field names to values
 	inputMap := make(map[string]string)
 	v := reflect.ValueOf(input)
@@ -127,7 +126,45 @@ func InsertVariableValuesIntoPromptMessagesCopy(input any, messages []openrouter
 		v = v.Elem()
 	}
 	if v.Kind() != reflect.Struct {
-		return nil, fmt.Errorf("input must be a struct or pointer to struct")
+		return content, fmt.Errorf("input must be a struct or pointer to struct")
+	}
+
+	t := v.Type()
+	for i := 0; i < v.NumField(); i++ {
+		field := t.Field(i)
+		value := v.Field(i)
+		// Get JSON tag name, fall back to field name
+		tag := field.Tag.Get("json")
+		if tag == "" || tag == "-" {
+			tag = field.Name
+		} else {
+			// Handle json tag options like "omitempty"
+			if commaIdx := strings.Index(tag, ","); commaIdx != -1 {
+				tag = tag[:commaIdx]
+			}
+		}
+		// Convert value to string
+		inputMap[tag] = fmt.Sprintf("%v", value.Interface())
+	}
+
+	// Check if varName exists in the map
+	if val, ok := inputMap[varName]; ok {
+		return val, nil
+	}
+
+	return content, nil
+}
+
+// InsertVariableValuesIntoContent replaces {{variable}} with its value in content
+func InsertVariableValuesIntoContent(input any, content string) (string, error) {
+	// Convert input to map of field names to values
+	inputMap := make(map[string]string)
+	v := reflect.ValueOf(input)
+	if v.Kind() == reflect.Ptr {
+		v = v.Elem()
+	}
+	if v.Kind() != reflect.Struct {
+		return content, fmt.Errorf("input must be a struct or pointer to struct")
 	}
 
 	t := v.Type()
@@ -151,17 +188,148 @@ func InsertVariableValuesIntoPromptMessagesCopy(input any, messages []openrouter
 	// Regex pattern to match {{variable}} but not /{{variable}}
 	pattern := regexp.MustCompile(`\{\{([^{}]+)\}\}`)
 
-	// Process each copied message
-	for i, msg := range copiedMessages {
-		// Replace matches in message content
-		copiedMessages[i].Content = pattern.ReplaceAllStringFunc(msg.Content, func(match string) string {
-			// Extract variable name
-			varName := match[2 : len(match)-2]
-			if val, ok := inputMap[varName]; ok {
-				return val
+	// Replace matches in content
+	result := pattern.ReplaceAllStringFunc(content, func(match string) string {
+		// Extract variable name
+		varName := match[2 : len(match)-2]
+		if val, ok := inputMap[varName]; ok {
+			return val
+		}
+		return match // Return original if not found
+	})
+
+	return result, nil
+}
+
+// TryParseMessageArray attempts to parse input.insertMessages as an array of messages
+// Returns the parsed messages and true if successful, otherwise nil and false
+func TryParseMessageArray(input any) ([]openrouter.Message, bool) {
+	// Get the insertMessages value from input
+	v := reflect.ValueOf(input)
+	if v.Kind() == reflect.Ptr {
+		v = v.Elem()
+	}
+	if v.Kind() != reflect.Struct {
+		return nil, false
+	}
+
+	var messagesJSON string
+
+	// Find insertMessages field
+	found := false
+	t := v.Type()
+	for i := 0; i < v.NumField(); i++ {
+		field := t.Field(i)
+		// Get JSON tag name
+		tag := field.Tag.Get("json")
+		if tag == "" || tag == "-" {
+			tag = field.Name
+		} else {
+			// Handle json tag options like "omitempty"
+			if commaIdx := strings.Index(tag, ","); commaIdx != -1 {
+				tag = tag[:commaIdx]
 			}
-			return match // Return original if not found
+		}
+
+		if tag == "insertMessages" {
+			found = true
+			messagesJSON = fmt.Sprintf("%v", v.Field(i).Interface())
+			break
+		}
+	}
+
+	if !found || messagesJSON == "" {
+		return nil, false
+	}
+
+	// Try to parse as JSON array of messages
+	var arbitraryMessages []ArbitraryMessage
+	if err := json.Unmarshal([]byte(messagesJSON), &arbitraryMessages); err != nil {
+		return nil, false
+	}
+
+	// Validate messages
+	if len(arbitraryMessages) == 0 {
+		return nil, false
+	}
+
+	var validMessages []openrouter.Message
+
+	for _, msg := range arbitraryMessages {
+		// Validate role and content
+		if msg.Role == "" || msg.Content == "" {
+			return nil, false
+		}
+
+		// Role must be user or assistant
+		if msg.Role != "user" && msg.Role != "assistant" {
+			return nil, false
+		}
+
+		validMessages = append(validMessages, openrouter.Message{
+			Role:    msg.Role,
+			Content: msg.Content,
 		})
+	}
+
+	if len(validMessages) == 0 {
+		return nil, false
+	}
+
+	return validMessages, true
+}
+
+func InsertVariableValuesIntoPromptMessagesCopy(input any, messages []openrouter.Message) ([]openrouter.Message, error) {
+	// Create a deep copy of messages to avoid modifying original
+	copiedMessages := make([]openrouter.Message, len(messages))
+	for i, msg := range messages {
+		copiedMessages[i] = openrouter.Message{
+			Role:    msg.Role,
+			Content: msg.Content,
+		}
+	}
+
+	// Process each message
+	i := 0
+	for i < len(copiedMessages) {
+		msg := copiedMessages[i]
+
+		// Check if this is a message insertion point
+		if msg.Content == "{{insertMessages}}" {
+			// Try to parse insertMessages as an array of messages
+			if parsedMessages, ok := TryParseMessageArray(input); ok {
+				// If successful, replace this message with the parsed messages
+				// Remove the current message
+				beforeMessages := make([]openrouter.Message, i)
+				copy(beforeMessages, copiedMessages[:i])
+
+				afterMessages := make([]openrouter.Message, len(copiedMessages)-i-1)
+				if i < len(copiedMessages)-1 {
+					copy(afterMessages, copiedMessages[i+1:])
+				}
+
+				// Create new message slice with parts assembled in order
+				newMessages := make([]openrouter.Message, 0, len(beforeMessages)+len(parsedMessages)+len(afterMessages))
+				newMessages = append(newMessages, beforeMessages...)
+				newMessages = append(newMessages, parsedMessages...)
+				newMessages = append(newMessages, afterMessages...)
+
+				copiedMessages = newMessages
+
+				// Don't increment i so we process the next message at the current position
+				continue
+			}
+		}
+
+		// Otherwise do normal variable substitution
+		newContent, err := InsertVariableValuesIntoContent(input, msg.Content)
+		if err != nil {
+			return nil, err
+		}
+		copiedMessages[i].Content = newContent
+
+		// Move to next message
+		i++
 	}
 
 	return copiedMessages, nil
@@ -176,7 +344,7 @@ func ParseMessages(input any, messages []openrouter.Message) ([]openrouter.Messa
 		return nil, fmt.Errorf("error processing conditional blocks: %w", err)
 	}
 
-	// Then substitute variables
+	// Then substitute variables and handle message insertions
 	finalMessages, err := InsertVariableValuesIntoPromptMessagesCopy(input, processedMessages)
 	if err != nil {
 		return nil, fmt.Errorf("error substituting variables: %w", err)

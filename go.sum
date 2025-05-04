@@ -1,4 +1,6 @@
 github.com/carsongh/go-sveltespa v0.0.0-20250412022541-86315dd61ca2 h1:f+G+KFMerVf2eQOja8czHYS9zcDzt+tjZ8w+AqdX7Uc=
 github.com/carsongh/go-sveltespa v0.0.0-20250412022541-86315dd61ca2/go.mod h1:+zwzNexRwb+P9S3owX+8jGKOI+FaK2hdzae9GqTX2ik=
+github.com/carsongh/strongmap v0.0.0-20250501020245-3d9fa80f1bb0 h1:08+ZPV9g7CGAI0X0060jDII3avYXJq7s29EyC1BXuV4=
+github.com/carsongh/strongmap v0.0.0-20250501020245-3d9fa80f1bb0/go.mod h1:EPBWo/IighiTvdhCCth3kw14LkFg/oF7bAVxiRynj54=
 github.com/mattn/go-sqlite3 v1.14.28 h1:ThEiQrnbtumT+QMknw63Befp/ce/nUPgBPMlRFEum7A=
 github.com/mattn/go-sqlite3 v1.14.28/go.mod h1:Uh1q+B4BYcTPb+yiD3kU8Ct7aC0hY9fxUwlHK0RXw+Y=

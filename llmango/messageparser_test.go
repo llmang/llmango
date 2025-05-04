@@ -14,6 +14,8 @@ type TestInput struct {
 	EmptyString    string `json:"emptyString"`
 	ZeroValue      int    `json:"zeroValue"`
 	NonEmptyString string `json:"nonEmptyString"`
+	// Add new field for testing insertMessages
+	InsertMessages string `json:"insertMessages"`
 }
 
 func TestParseMessageIfStatements(t *testing.T) {
@@ -524,4 +526,154 @@ Ensure topics are unique.`
 			t.Errorf("Expected:\n%s\n\nGot:\n%s", expected, result[0].Content)
 		}
 	})
+}
+
+func TestInsertMessagesFeature(t *testing.T) {
+	// Test input with a field containing valid JSON messages array
+	validMessagesJSON := `[{"role":"user","content":"Hello there"},{"role":"assistant","content":"Hi, how can I help?"}]`
+
+	// Test input with invalid JSON
+	invalidMessagesJSON := `not valid json`
+
+	// Test input with valid JSON but invalid message format
+	invalidFormatJSON := `[{"role":"invalid_role","content":"Test"},{"role":"user","content":""}]`
+
+	// Test inputs
+	tests := []struct {
+		name           string
+		input          interface{}
+		messages       []openrouter.Message
+		expectedResult []openrouter.Message
+	}{
+		{
+			name: "Basic insertion - exact match",
+			input: struct {
+				InsertMessages string `json:"insertMessages"`
+			}{
+				InsertMessages: validMessagesJSON,
+			},
+			messages: []openrouter.Message{
+				{Role: "user", Content: "{{insertMessages}}"},
+			},
+			expectedResult: []openrouter.Message{
+				{Role: "user", Content: "Hello there"},
+				{Role: "assistant", Content: "Hi, how can I help?"},
+			},
+		},
+		{
+			name: "Mixed scenario - messages before and after",
+			input: struct {
+				InsertMessages string `json:"insertMessages"`
+			}{
+				InsertMessages: validMessagesJSON,
+			},
+			messages: []openrouter.Message{
+				{Role: "user", Content: "First message"},
+				{Role: "assistant", Content: "{{insertMessages}}"},
+				{Role: "user", Content: "Last message"},
+			},
+			expectedResult: []openrouter.Message{
+				{Role: "user", Content: "First message"},
+				{Role: "user", Content: "Hello there"},
+				{Role: "assistant", Content: "Hi, how can I help?"},
+				{Role: "user", Content: "Last message"},
+			},
+		},
+		{
+			name: "Not exact match - process as variable",
+			input: struct {
+				InsertMessages string `json:"insertMessages"`
+			}{
+				InsertMessages: validMessagesJSON,
+			},
+			messages: []openrouter.Message{
+				{Role: "user", Content: "This is {{insertMessages}} as part of text"},
+			},
+			expectedResult: []openrouter.Message{
+				{Role: "user", Content: "This is " + validMessagesJSON + " as part of text"},
+			},
+		},
+		{
+			name: "Invalid JSON - fallback to string",
+			input: struct {
+				InsertMessages string `json:"insertMessages"`
+			}{
+				InsertMessages: invalidMessagesJSON,
+			},
+			messages: []openrouter.Message{
+				{Role: "user", Content: "{{insertMessages}}"},
+			},
+			expectedResult: []openrouter.Message{
+				{Role: "user", Content: invalidMessagesJSON},
+			},
+		},
+		{
+			name: "Invalid message format - fallback to string",
+			input: struct {
+				InsertMessages string `json:"insertMessages"`
+			}{
+				InsertMessages: invalidFormatJSON,
+			},
+			messages: []openrouter.Message{
+				{Role: "user", Content: "{{insertMessages}}"},
+			},
+			expectedResult: []openrouter.Message{
+				{Role: "user", Content: invalidFormatJSON},
+			},
+		},
+		{
+			name: "Empty messages array - preserve original message",
+			input: struct {
+				InsertMessages string `json:"insertMessages"`
+			}{
+				InsertMessages: "[]",
+			},
+			messages: []openrouter.Message{
+				{Role: "user", Content: "{{insertMessages}}"},
+			},
+			expectedResult: []openrouter.Message{
+				{Role: "user", Content: "[]"},
+			},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			// Create a copy of original messages for comparison
+			originalMessages := make([]openrouter.Message, len(test.messages))
+			for i, msg := range test.messages {
+				originalMessages[i] = openrouter.Message{
+					Role:    msg.Role,
+					Content: msg.Content,
+				}
+			}
+
+			// Process the messages
+			result, err := ParseMessages(test.input, test.messages)
+			if err != nil {
+				t.Fatalf("ParseMessages returned error: %v", err)
+			}
+
+			// Check the result length
+			if len(result) != len(test.expectedResult) {
+				t.Fatalf("Expected %d messages, got %d", len(test.expectedResult), len(result))
+			}
+
+			// Check each message in the result
+			for i, msg := range result {
+				expected := test.expectedResult[i]
+				if msg.Role != expected.Role || msg.Content != expected.Content {
+					t.Errorf("Message %d: expected {%s, %s}, got {%s, %s}",
+						i, expected.Role, expected.Content, msg.Role, msg.Content)
+				}
+			}
+
+			// Check that original messages weren't modified
+			for i, msg := range test.messages {
+				if msg.Role != originalMessages[i].Role || msg.Content != originalMessages[i].Content {
+					t.Errorf("Original message %d was modified", i)
+				}
+			}
+		})
+	}
 }

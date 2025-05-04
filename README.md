@@ -43,6 +43,46 @@ prompt := "Hello {{name}}, you are {{age}} years old."
 
 Variable names are matched against the JSON tags of your input struct fields.
 
+### Message Insertion
+
+Use `{{insertMessages}}` as the ***EXACT*** content of a message to insert multiple messages from your input:
+
+```go
+type MyInput struct {
+    InsertMessages string `json:"insertMessages"`
+}
+
+// In your code
+input := MyInput{
+    InsertMessages: `[{"role":"user","content":"Hello there"},{"role":"assistant","content":"Hi, how can I help?"}]`,
+}
+
+// Original message list
+messages := []openrouter.Message{
+    {Role: "user", Content: "First message"},
+    {Role: "assistant", Content: "{{insertMessages}}"},
+    {Role: "user", Content: "Last message"},
+}
+
+// Result after parsing will be:
+// [
+//   {Role: "user", Content: "First message"},
+//   {Role: "user", Content: "Hello there"},
+//   {Role: "assistant", Content: "Hi, how can I help?"},
+//   {Role: "user", Content: "Last message"},
+// ]
+```
+
+#### Rules and Limitations for Message Insertion
+
+- The message content must be exactly `{{insertMessages}}` (no other content)
+- The `insertMessages` field in your input struct must contain a valid JSON array of message objects
+- Each message must have a `role` that is either "user" or "assistant"
+- Each message must have non-empty `content`
+- If the JSON is invalid or any message is invalid, the original `{{insertMessages}}` will be replaced with the raw string value
+- If `{{insertMessages}}` appears as part of other text, it will be processed as a regular variable replacement
+- Message insertion is processed after conditional blocks but during variable replacement
+
 ### Conditional Blocks
 
 Use `{{#if variableName}}...{{/if}}` to include content only when a variable exists and is not empty. You can also use `{{:else}}` for an else block.
@@ -69,7 +109,7 @@ prompt := `
 - Nested if statements are not supported (will be treated as text)
 - Malformed if statements will remain unchanged in the output
 - Unmatched variable names will remain as `{{variableName}}` in the output
-- If statements are processed first, then variable replacements
+- If statements are processed first, then variable replacements and message insertions
 - Else statements (`{{:else}}`) are functional but not fully tested.
 
 ## Optional Frontend UI Setup
