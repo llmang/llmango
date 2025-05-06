@@ -12,9 +12,13 @@ import (
 )
 
 func Run[I, R any](l *LLMangoManager, g *Goal, input *I) (*R, error) {
+	res, _, err := RunRaw[I, R](l, g, input)
+	return res, err
+}
+func RunRaw[I, R any](l *LLMangoManager, g *Goal, input *I) (*R, *openrouter.NonStreamingChatResponse, error) {
 	inputoutput, ok := g.InputOutput.(InputOutput[I, R])
 	if !ok {
-		return nil, fmt.Errorf("goal '%s' has invalid or missing InputOutput configuration for types %T -> %T", g.UID, *new(I), *new(R))
+		return nil, nil, fmt.Errorf("goal '%s' has invalid or missing InputOutput configuration for types %T -> %T", g.UID, *new(I), *new(R))
 	}
 
 	requestStartTime := float64(time.Now().UnixNano()) / 1e9
@@ -58,9 +62,9 @@ func Run[I, R any](l *LLMangoManager, g *Goal, input *I) (*R, error) {
 			}
 		}
 		if hasBasePrompt {
-			return nil, fmt.Errorf("no valid prompts available for goal %s", g.UID)
+			return nil, nil, fmt.Errorf("no valid prompts available for goal %s", g.UID)
 		} else {
-			return nil, fmt.Errorf("no valid prompts available for goal %s and no base prompt exists or is loaded", g.UID)
+			return nil, nil, fmt.Errorf("no valid prompts available for goal %s and no base prompt exists or is loaded", g.UID)
 		}
 	}
 
@@ -85,12 +89,12 @@ func Run[I, R any](l *LLMangoManager, g *Goal, input *I) (*R, error) {
 	}
 
 	if selectedPrompt == nil {
-		return nil, errors.New("failed to select prompt after weighted random selection")
+		return nil, nil, errors.New("failed to select prompt after weighted random selection")
 	}
 
 	updatedMessages, err := ParseMessages(input, selectedPrompt.Messages)
 	if err != nil {
-		return nil, fmt.Errorf("failed to update prompt messages with err: %w", err)
+		return nil, nil, fmt.Errorf("failed to update prompt messages with err: %w", err)
 	}
 
 	routerRequest := &openrouter.OpenRouterRequest{
@@ -102,7 +106,7 @@ func Run[I, R any](l *LLMangoManager, g *Goal, input *I) (*R, error) {
 
 	responseFormat, err := openrouter.UseOpenRouterJsonFormat(inputoutput.OutputExample, g.Title)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create JSON schema format: %w", err)
+		return nil, nil, fmt.Errorf("failed to create JSON schema format: %w", err)
 	}
 
 	routerRequest.Parameters.ResponseFormat = responseFormat
@@ -147,7 +151,7 @@ func Run[I, R any](l *LLMangoManager, g *Goal, input *I) (*R, error) {
 				}(logEntry)
 			}
 		}
-		return nil, fmt.Errorf("error generating response from OpenRouter for goal %s: %w", g.UID, logErr)
+		return nil, nil, fmt.Errorf("error generating response from OpenRouter for goal %s: %w", g.UID, logErr)
 	}
 
 	if openrouterResponse == nil {
@@ -164,7 +168,7 @@ func Run[I, R any](l *LLMangoManager, g *Goal, input *I) (*R, error) {
 				log.Printf("Failed to create log object for nil response: %v", createLogErr)
 			}
 		}
-		return nil, logErr
+		return nil, nil, logErr
 	}
 
 	if len(openrouterResponse.Choices) == 0 || openrouterResponse.Choices[0].Message.Content == nil {
@@ -181,7 +185,7 @@ func Run[I, R any](l *LLMangoManager, g *Goal, input *I) (*R, error) {
 				log.Printf("Failed to create log object for empty choices/content: %v", createLogErr)
 			}
 		}
-		return nil, logErr
+		return nil, nil, logErr
 	}
 
 	content := *openrouterResponse.Choices[0].Message.Content
@@ -199,7 +203,7 @@ func Run[I, R any](l *LLMangoManager, g *Goal, input *I) (*R, error) {
 				log.Printf("Failed to create log object for decoding error: %v", createLogErr)
 			}
 		}
-		return nil, logErr
+		return nil, nil, logErr
 	}
 
 	if l.Logging != nil && l.Logging.LogResponse != nil {
@@ -215,5 +219,5 @@ func Run[I, R any](l *LLMangoManager, g *Goal, input *I) (*R, error) {
 		}
 	}
 
-	return &res, nil
+	return &res, openrouterResponse, nil
 }
