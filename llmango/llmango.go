@@ -47,6 +47,16 @@ type Prompt struct {
 	TotalRuns int  `json:"totalRuns"`
 }
 
+var CustomGoal = Goal{
+	InputOutput: InputOutput{
+		inputExample:
+		inputValidator:
+		outputExample:
+		outputValidator:
+
+	},
+}
+
 type Goal struct {
 	UID         string   `json:"UID"`
 	Title       string   `json:"title"`
