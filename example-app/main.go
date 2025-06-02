@@ -114,7 +114,7 @@ func setupTestData() {
 		Weight: 100,
 		Messages: []openrouter.Message{
 			{Role: "system", Content: "You are a sentiment analysis expert. Analyze the sentiment of the given text."},
-			{Role: "user", Content: "Analyze the sentiment of this text: {{.text}}"},
+			{Role: "user", Content: "Analyze the sentiment of this text: {{text}}"},
 		},
 		Parameters: openrouter.Parameters{
 			Temperature: &[]float64{0.3}[0],
@@ -128,7 +128,7 @@ func setupTestData() {
 		Weight: 100,
 		Messages: []openrouter.Message{
 			{Role: "system", Content: "You are a text summarization expert. Create concise summaries with key points."},
-			{Role: "user", Content: "Summarize this text: {{.text}}"},
+			{Role: "user", Content: "Summarize this text: {{text}}"},
 		},
 		Parameters: openrouter.Parameters{
 			Temperature: &[]float64{0.5}[0],
@@ -143,7 +143,7 @@ func setupTestData() {
 		Weight: 100,
 		Messages: []openrouter.Message{
 			{Role: "system", Content: "You are a sentiment analysis expert. Analyze the sentiment of the given text."},
-			{Role: "user", Content: "Analyze the sentiment of this text: {{.text}}"},
+			{Role: "user", Content: "Analyze the sentiment of this text: {{text}}"},
 		},
 		Parameters: openrouter.Parameters{
 			Temperature: &[]float64{0.3}[0],
@@ -157,7 +157,7 @@ func setupTestData() {
 		Weight: 100,
 		Messages: []openrouter.Message{
 			{Role: "system", Content: "You are a text summarization expert. Create concise summaries with key points."},
-			{Role: "user", Content: "Summarize this text: {{.text}}"},
+			{Role: "user", Content: "Summarize this text: {{text}}"},
 		},
 		Parameters: openrouter.Parameters{
 			Temperature: &[]float64{0.5}[0],

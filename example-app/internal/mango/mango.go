@@ -10,17 +10,6 @@ import (
 
 // Config-generated goals and prompts
 
-// languageDetectionGoal is generated from configuration
-var languageDetectionGoal = llmango.Goal{
-	UID:         "language-detection",
-	Title:       "Language Detection",
-	Description: "Detects the language of input text",
-	InputOutput: llmango.InputOutput[LanguageInput, LanguageOutput]{
-		InputExample:  LanguageInput{},
-		OutputExample: LanguageOutput{},
-	},
-}
-
 // sentimentAnalysisGoal is generated from configuration
 var sentimentAnalysisGoal = llmango.Goal{
 	UID:         "sentiment-analysis",
@@ -54,20 +43,14 @@ var emailClassificationGoal = llmango.Goal{
 	},
 }
 
-// emailClassificationClaudePrompt is generated from configuration
-var emailClassificationClaudePrompt = llmango.Prompt{
-	UID:     "email-classification-claude",
-	GoalUID: "email-classification",
-	Model:   "anthropic/claude-3-sonnet",
-	Weight:  100,
-	IsCanary: false,
-	MaxRuns: 0,
-	Messages: []openrouter.Message{
-		{Role: "system", Content: "You are an email classification expert. Classify emails into categories: spam, important, promotional, personal, work."},
-		{Role: "user", Content: "Classify this email:
-Subject: {{subject}}
-From: {{sender}}
-Body: {{body}}"},
+// languageDetectionGoal is generated from configuration
+var languageDetectionGoal = llmango.Goal{
+	UID:         "language-detection",
+	Title:       "Language Detection",
+	Description: "Detects the language of input text",
+	InputOutput: llmango.InputOutput[LanguageInput, LanguageOutput]{
+		InputExample:  LanguageInput{},
+		OutputExample: LanguageOutput{},
 	},
 }
 
@@ -172,6 +155,23 @@ Body: {{body}}"},
 	},
 }
 
+// emailClassificationClaudePrompt is generated from configuration
+var emailClassificationClaudePrompt = llmango.Prompt{
+	UID:     "email-classification-claude",
+	GoalUID: "email-classification",
+	Model:   "anthropic/claude-3-sonnet",
+	Weight:  100,
+	IsCanary: false,
+	MaxRuns: 0,
+	Messages: []openrouter.Message{
+		{Role: "system", Content: "You are an email classification expert. Classify emails into categories: spam, important, promotional, personal, work."},
+		{Role: "user", Content: "Classify this email:
+Subject: {{subject}}
+From: {{sender}}
+Body: {{body}}"},
+	},
+}
+
 type Mango struct {
 	*llmango.LLMangoManager
 }
@@ -184,15 +184,14 @@ func CreateMango(or *openrouter.OpenRouter) (*Mango, error) {
 
 	// Initialize goals
 	llmangoManager.AddGoals(
-		&languageDetectionGoal,
 		&sentimentAnalysisGoal,
 		&textSummaryGoal,
 		&emailClassificationGoal,
+		&languageDetectionGoal,
 	)
 
 	// Initialize prompts
 	llmangoManager.AddPrompts(
-		&emailClassificationClaudePrompt,
 		&languageDetectionOpenaiPrompt,
 		&languageDetectionLlamaPrompt,
 		&sentimentUniversalPrompt,
@@ -200,21 +199,12 @@ func CreateMango(or *openrouter.OpenRouter) (*Mango, error) {
 		&sentimentStructuredPrompt,
 		&summaryStructuredPrompt,
 		&emailClassificationOpenaiPrompt,
+		&emailClassificationClaudePrompt,
 	)
 
 	return &Mango{llmangoManager}, nil
 }
 
-
-// LanguageDetection executes the Language Detection goal
-func (m *Mango) LanguageDetection(input *LanguageInput) (*LanguageOutput, error) {
-	return llmango.Run[LanguageInput, LanguageOutput](m.LLMangoManager, &languageDetectionGoal, input)
-}
-
-// LanguageDetectionRaw executes the Language Detection goal and returns the raw OpenRouter response
-func (m *Mango) LanguageDetectionRaw(input *LanguageInput) (*LanguageOutput, *openrouter.NonStreamingChatResponse, error) {
-	return llmango.RunRaw[LanguageInput, LanguageOutput](m.LLMangoManager, &languageDetectionGoal, input)
-}
 
 // SentimentAnalysis executes the Sentiment Analysis goal
 func (m *Mango) SentimentAnalysis(input *SentimentInput) (*SentimentOutput, error) {
@@ -244,4 +234,14 @@ func (m *Mango) EmailClassification(input *EmailInput) (*EmailOutput, error) {
 // EmailClassificationRaw executes the Email Classification goal and returns the raw OpenRouter response
 func (m *Mango) EmailClassificationRaw(input *EmailInput) (*EmailOutput, *openrouter.NonStreamingChatResponse, error) {
 	return llmango.RunRaw[EmailInput, EmailOutput](m.LLMangoManager, &emailClassificationGoal, input)
+}
+
+// LanguageDetection executes the Language Detection goal
+func (m *Mango) LanguageDetection(input *LanguageInput) (*LanguageOutput, error) {
+	return llmango.Run[LanguageInput, LanguageOutput](m.LLMangoManager, &languageDetectionGoal, input)
+}
+
+// LanguageDetectionRaw executes the Language Detection goal and returns the raw OpenRouter response
+func (m *Mango) LanguageDetectionRaw(input *LanguageInput) (*LanguageOutput, *openrouter.NonStreamingChatResponse, error) {
+	return llmango.RunRaw[LanguageInput, LanguageOutput](m.LLMangoManager, &languageDetectionGoal, input)
 }

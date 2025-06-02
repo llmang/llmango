@@ -91,35 +91,49 @@ func (m *LLMangoManager) executeWithStructuredOutput(goal *Goal, prompt *Prompt,
 		Model:      &prompt.Model,
 		Parameters: prompt.Parameters,
 	}
+	
+	log.Printf("🚀 STRUCTURED PATH - Sending request to OpenRouter:")
+	log.Printf("📤 Model: %s", prompt.Model)
+	log.Printf("📤 Messages count: %d", len(updatedMessages))
+	for i, msg := range updatedMessages {
+		log.Printf("📤 Message %d [%s]: %s", i, msg.Role, msg.Content)
+	}
 
 	// Generate JSON schema for structured output
 	var outputExample interface{}
 	if err := json.Unmarshal(goal.OutputExample, &outputExample); err != nil {
 		// If we can't unmarshal the output example, fall back to universal path
-		log.Printf("Failed to unmarshal output example for structured path, falling back to universal: %v", err)
+		log.Printf("❌ Failed to unmarshal output example for structured path, falling back to universal: %v", err)
 		return m.executeWithUniversalCompatibility(goal, prompt, input)
 	}
 	
 	responseFormat, err := openrouter.UseOpenRouterJsonFormat(outputExample, goal.Title)
 	if err != nil {
 		// If schema generation fails, fall back to universal path
-		log.Printf("Failed to generate JSON schema for structured path, falling back to universal: %v", err)
+		log.Printf("❌ Failed to generate JSON schema for structured path, falling back to universal: %v", err)
 		return m.executeWithUniversalCompatibility(goal, prompt, input)
 	}
 
 	routerRequest.Parameters.ResponseFormat = responseFormat
+	log.Printf("📤 Response format schema: %+v", responseFormat)
 
 	// Execute request
+	log.Printf("🌐 Sending request to OpenRouter...")
 	response, err := m.OpenRouter.GenerateNonStreamingChatResponse(routerRequest)
 	if err != nil {
+		log.Printf("❌ OpenRouter request failed: %v", err)
 		return nil, fmt.Errorf("structured output execution failed: %w", err)
 	}
 
+	log.Printf("📥 Received response from OpenRouter")
+	log.Printf("📥 Response choices count: %d", len(response.Choices))
 	if len(response.Choices) == 0 || response.Choices[0].Message.Content == nil {
+		log.Printf("❌ Empty response from OpenRouter")
 		return nil, fmt.Errorf("received empty response from structured output execution")
 	}
 
 	content := *response.Choices[0].Message.Content
+	log.Printf("📥 Raw response content: %s", content)
 	outputJSON := json.RawMessage(content)
 
 	// Validate output using the goal's validator
@@ -191,30 +205,51 @@ func (m *LLMangoManager) executeWithUniversalCompatibility(goal *Goal, prompt *P
 		Model:      &prompt.Model,
 		Parameters: prompt.Parameters,
 	}
+	
+	log.Printf("🌐 UNIVERSAL PATH - Sending request to OpenRouter:")
+	log.Printf("📤 Model: %s", prompt.Model)
+	log.Printf("📤 Final messages count: %d", len(finalMessages))
+	for i, msg := range finalMessages {
+		log.Printf("📤 Message %d [%s]: %s", i, msg.Role, msg.Content)
+	}
 
 	// Execute request
+	log.Printf("🌐 Sending request to OpenRouter...")
 	response, err := m.OpenRouter.GenerateNonStreamingChatResponse(routerRequest)
 	if err != nil {
+		log.Printf("❌ OpenRouter request failed: %v", err)
 		return nil, fmt.Errorf("universal compatibility execution failed: %w", err)
 	}
 
+	log.Printf("📥 Received response from OpenRouter")
+	log.Printf("📥 Response choices count: %d", len(response.Choices))
 	if len(response.Choices) == 0 || response.Choices[0].Message.Content == nil {
+		log.Printf("❌ Empty response from OpenRouter")
 		return nil, fmt.Errorf("received empty response from universal compatibility execution")
 	}
 
 	content := *response.Choices[0].Message.Content
+	log.Printf("📥 Raw response content: %s", content)
 
 	// Extract and clean JSON from response using existing cleaner
+	log.Printf("🧹 Cleaning JSON from response...")
 	cleanedJSON := openrouter.PseudoStructuredResponseCleaner(content)
+	log.Printf("🧹 Cleaned JSON: %s", cleanedJSON)
+	
 	if cleanedJSON == "" {
+		log.Printf("❌ Failed to extract JSON from response")
 		return nil, fmt.Errorf("failed to extract valid JSON from response: %s", content)
 	}
 
 	// Validate JSON against schema
 	outputJSON := json.RawMessage(cleanedJSON)
+	log.Printf("🔍 Validating JSON against schema...")
 	if err := openrouter.ValidateJSONAgainstSchema(outputJSON, schema); err != nil {
+		log.Printf("❌ JSON validation failed: %v", err)
+		log.Printf("❌ Invalid JSON: %s", cleanedJSON)
 		return nil, fmt.Errorf("response validation failed for universal path: %w", err)
 	}
+	log.Printf("✅ JSON validation passed")
 
 	// Validate output using the goal's validator
 	if goal.OutputValidator != nil {
