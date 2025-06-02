@@ -1,0 +1,110 @@
+# LLMango Dual-Path Test Configuration
+goals:
+  - uid: "sentiment-analysis"
+    title: "Sentiment Analysis"
+    description: "Analyzes the sentiment of text input"
+    input_type: "SentimentInput"
+    output_type: "SentimentOutput"
+    
+  - uid: "text-summary"
+    title: "Text Summary"
+    description: "Summarizes long text into key points"
+    input_type: "SummaryInput"
+    output_type: "SummaryOutput"
+
+  # Config-based goals (these will be generated from config, not Go code)
+  - uid: "email-classification"
+    title: "Email Classification"
+    description: "Classifies emails into categories like spam, important, promotional"
+    input_type: "EmailInput"
+    output_type: "EmailOutput"
+
+  - uid: "language-detection"
+    title: "Language Detection"
+    description: "Detects the language of input text"
+    input_type: "LanguageInput"
+    output_type: "LanguageOutput"
+
+prompts:
+  # Structured Output Prompts (OpenAI models)
+  - uid: "sentiment-structured"
+    goal_uid: "sentiment-analysis"
+    model: "openai/gpt-4"
+    weight: 100
+    messages:
+      - role: "system"
+        content: "You are a sentiment analysis expert. Analyze the sentiment of the given text and provide a confidence score."
+      - role: "user"
+        content: "Analyze the sentiment of this text: {{text}}"
+        
+  - uid: "summary-structured"
+    goal_uid: "text-summary"
+    model: "openai/gpt-3.5-turbo"
+    weight: 100
+    messages:
+      - role: "system"
+        content: "You are a text summarization expert. Create concise summaries with key points."
+      - role: "user"
+        content: "Summarize this text: {{text}}"
+
+  # Prompts for config-based goals
+  - uid: "email-classification-openai"
+    goal_uid: "email-classification"
+    model: "openai/gpt-4"
+    weight: 100
+    messages:
+      - role: "system"
+        content: "You are an email classification expert. Classify emails into categories: spam, important, promotional, personal, work."
+      - role: "user"
+        content: "Classify this email:\nSubject: {{subject}}\nFrom: {{sender}}\nBody: {{body}}"
+
+  - uid: "email-classification-claude"
+    goal_uid: "email-classification"
+    model: "anthropic/claude-3-sonnet"
+    weight: 100
+    messages:
+      - role: "system"
+        content: "You are an email classification expert. Classify emails into categories: spam, important, promotional, personal, work."
+      - role: "user"
+        content: "Classify this email:\nSubject: {{subject}}\nFrom: {{sender}}\nBody: {{body}}"
+
+  - uid: "language-detection-openai"
+    goal_uid: "language-detection"
+    model: "openai/gpt-3.5-turbo"
+    weight: 100
+    messages:
+      - role: "system"
+        content: "You are a language detection expert. Identify the language of the given text and provide the language name and ISO code."
+      - role: "user"
+        content: "What language is this text: {{text}}"
+
+  - uid: "language-detection-llama"
+    goal_uid: "language-detection"
+    model: "meta-llama/llama-3.1-405b-instruct"
+    weight: 100
+    messages:
+      - role: "system"
+        content: "You are a language detection expert. Identify the language of the given text and provide the language name and ISO code."
+      - role: "user"
+        content: "What language is this text: {{text}}"
+
+  # Universal Compatibility Prompts (Non-OpenAI models)
+  - uid: "sentiment-universal"
+    goal_uid: "sentiment-analysis"
+    model: "anthropic/claude-3-sonnet"
+    weight: 100
+    messages:
+      - role: "system"
+        content: "You are a sentiment analysis expert. Analyze the sentiment of the given text and provide a confidence score."
+      - role: "user"
+        content: "Analyze the sentiment of this text: {{text}}"
+        
+  - uid: "summary-universal"
+    goal_uid: "text-summary"
+    model: "meta-llama/llama-3.1-405b-instruct"
+    weight: 100
+    messages:
+      - role: "system"
+        content: "You are a text summarization expert. Create concise summaries with key points."
+      - role: "user"
+        content: "Summarize this text: {{text}}"
