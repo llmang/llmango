@@ -63,10 +63,18 @@ func (d *Definition) MarshalJSON() ([]byte, error) {
 }
 
 func GenerateSchemaForType(v any) (*Definition, error) {
-	return reflectSchema(reflect.TypeOf(v))
+	t := reflect.TypeOf(v)
+	if t == nil {
+		return nil, fmt.Errorf("cannot generate schema for nil value")
+	}
+	return reflectSchema(t)
 }
 
 func reflectSchema(t reflect.Type) (*Definition, error) {
+	if t == nil {
+		return nil, fmt.Errorf("cannot generate schema for nil type")
+	}
+	
 	var d Definition
 	switch t.Kind() {
 	case reflect.String:

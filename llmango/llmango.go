@@ -1,6 +1,7 @@
 package llmango
 
 import (
+	"encoding/json"
 	"fmt"
 	"slices"
 	"time"
@@ -47,16 +48,6 @@ type Prompt struct {
 	TotalRuns int  `json:"totalRuns"`
 }
 
-var CustomGoal = Goal{
-	InputOutput: InputOutput{
-		inputExample:
-		inputValidator:
-		outputExample:
-		outputValidator:
-
-	},
-}
-
 type Goal struct {
 	UID         string   `json:"UID"`
 	Title       string   `json:"title"`
@@ -64,14 +55,31 @@ type Goal struct {
 	CreatedAt   int      `json:"createdAt"`
 	UpdatedAt   int      `json:"updatedAt"`
 	PromptUIDs  []string `json:"promptUIDs" savestate:"-"` //built during runtime so make sure to not save it in json or database
-	InputOutput any      `json:"inputOutput"`              //use InputOutput here
+
+	// Flag: false = typed goal, true = JSON object goal
+	IsSchemaValidated bool `json:"isSchemaValidated"`
+
+	// Unified serializable storage
+	InputExample  json.RawMessage `json:"inputExample"`
+	OutputExample json.RawMessage `json:"outputExample"`
+
+	// Runtime validators (reconstructed on startup)
+	InputValidator  func(json.RawMessage) error `json:"-"`
+	OutputValidator func(json.RawMessage) error `json:"-"`
 }
 
+// Legacy InputOutput struct for backwards compatibility during transition
 type InputOutput[input any, output any] struct {
 	InputExample    input             `json:"inputExample"`
 	InputValidator  func(input) bool  `json:"-"`
 	OutputExample   output            `json:"outputExample"`
 	OutputValidator func(output) bool `json:"-"`
+}
+
+// GoalValidator interface for typed goals
+type GoalValidator[I, O any] interface {
+	ValidateInput(input I) error
+	ValidateOutput(output O) error
 }
 
 type Result[T any] struct {
@@ -173,4 +181,163 @@ func (m *LLMangoManager) AddPrompts(prompts ...*Prompt) {
 			}
 		}
 	}
+}
+
+// Goal Validation and Utility Functions
+
+// Validate checks for inconsistent goal states and returns warnings
+func (g *Goal) Validate() []string {
+	var warnings []string
+
+	// For typed goals, warn if no validators are provided
+	if !g.IsSchemaValidated && g.InputValidator == nil && g.OutputValidator == nil {
+		warnings = append(warnings, "Typed goal has no validators - consider adding validation")
+	}
+
+	// Note: JSON goals are expected to have function validators (generated from schemas)
+	// so we don't warn about that case
+
+	return warnings
+}
+
+// TypedValidator provides typed validation functions for NewGoal
+type TypedValidator[I, O any] struct {
+	ValidateInput  func(I) error
+	ValidateOutput func(O) error
+}
+
+// Factory Functions for Goal Creation
+
+// NewGoal creates a typed goal with optional validators (standard way for developers)
+func NewGoal[I, O any](uid, title, description string, inputExample I, outputExample O, validator ...TypedValidator[I, O]) *Goal {
+	// Marshal examples to JSON for unified storage
+	inputJSON, err := json.Marshal(inputExample)
+	if err != nil {
+		panic(fmt.Sprintf("failed to marshal input example: %v", err))
+	}
+
+	outputJSON, err := json.Marshal(outputExample)
+	if err != nil {
+		panic(fmt.Sprintf("failed to marshal output example: %v", err))
+	}
+
+	goal := &Goal{
+		UID:               uid,
+		Title:             title,
+		Description:       description,
+		CreatedAt:         int(time.Now().Unix()),
+		UpdatedAt:         int(time.Now().Unix()),
+		PromptUIDs:        []string{},
+		IsSchemaValidated: false, // Typed goal
+		InputExample:      inputJSON,
+		OutputExample:     outputJSON,
+	}
+
+	// Create wrapper validators if provided
+	if len(validator) > 0 {
+		v := validator[0]
+
+		// Wrap input validator
+		if v.ValidateInput != nil {
+			goal.InputValidator = func(jsonInput json.RawMessage) error {
+				var input I
+				if err := json.Unmarshal(jsonInput, &input); err != nil {
+					return fmt.Errorf("invalid input JSON: %w", err)
+				}
+				return v.ValidateInput(input)
+			}
+		}
+
+		// Wrap output validator
+		if v.ValidateOutput != nil {
+			goal.OutputValidator = func(jsonOutput json.RawMessage) error {
+				var output O
+				if err := json.Unmarshal(jsonOutput, &output); err != nil {
+					return fmt.Errorf("invalid output JSON: %w", err)
+				}
+				return v.ValidateOutput(output)
+			}
+		}
+	}
+
+	return goal
+}
+
+// NewJSONGoal creates a JSON object goal (standard way for frontend/dynamic use)
+func NewJSONGoal(uid, title, description string, inputExample, outputExample json.RawMessage) *Goal {
+	goal := &Goal{
+		UID:               uid,
+		Title:             title,
+		Description:       description,
+		CreatedAt:         int(time.Now().Unix()),
+		UpdatedAt:         int(time.Now().Unix()),
+		PromptUIDs:        []string{},
+		IsSchemaValidated: true, // JSON object goal
+		InputExample:      inputExample,
+		OutputExample:     outputExample,
+	}
+
+	// Generate schema validators from JSON examples
+	if err := goal.generateSchemaValidators(); err != nil {
+		panic(fmt.Sprintf("failed to generate schema validators: %v", err))
+	}
+
+	return goal
+}
+
+// generateSchemaValidators creates JSON schema validators from examples
+func (g *Goal) generateSchemaValidators() error {
+	// Generate input schema validator
+	if len(g.InputExample) > 0 {
+		inputSchema, err := openrouter.GenerateSchemaFromJSONExample(g.InputExample)
+		if err != nil {
+			return fmt.Errorf("failed to generate input schema: %w", err)
+		}
+
+		g.InputValidator = func(jsonInput json.RawMessage) error {
+			return openrouter.ValidateJSONAgainstSchema(jsonInput, inputSchema)
+		}
+	}
+
+	// Generate output schema validator
+	if len(g.OutputExample) > 0 {
+		outputSchema, err := openrouter.GenerateSchemaFromJSONExample(g.OutputExample)
+		if err != nil {
+			return fmt.Errorf("failed to generate output schema: %w", err)
+		}
+
+		g.OutputValidator = func(jsonOutput json.RawMessage) error {
+			return openrouter.ValidateJSONAgainstSchema(jsonOutput, outputSchema)
+		}
+	}
+
+	return nil
+}
+
+// ConvertTypedGoalToJSON converts an existing typed goal to JSON format
+func ConvertTypedGoalToJSON(typedGoal *Goal) (*Goal, error) {
+	if typedGoal.IsSchemaValidated {
+		return typedGoal, nil // Already JSON format
+	}
+
+	// Create new JSON goal with same data
+	return NewJSONGoal(
+		typedGoal.UID,
+		typedGoal.Title,
+		typedGoal.Description,
+		typedGoal.InputExample,
+		typedGoal.OutputExample,
+	), nil
+}
+
+// ReconstructValidators reconstructs validators for a goal after deserialization
+func (g *Goal) ReconstructValidators() error {
+	if g.IsSchemaValidated {
+		// Generate schema validators from JSON examples
+		return g.generateSchemaValidators()
+	}
+	// For typed goals, validators would need to be reconstructed from stored metadata
+	// This is a placeholder - in practice, typed goals would need their validators
+	// to be re-registered after startup
+	return nil
 }

@@ -16,9 +16,16 @@ func Run[I, R any](l *LLMangoManager, g *Goal, input *I) (*R, error) {
 	return res, err
 }
 func RunRaw[I, R any](l *LLMangoManager, g *Goal, input *I) (*R, *openrouter.NonStreamingChatResponse, error) {
-	inputoutput, ok := g.InputOutput.(InputOutput[I, R])
-	if !ok {
-		return nil, nil, fmt.Errorf("goal '%s' has invalid or missing InputOutput configuration for types %T -> %T", g.UID, *new(I), *new(R))
+	// Validate input using the goal's validator
+	inputJSON, err := json.Marshal(input)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to marshal input for goal '%s': %w", g.UID, err)
+	}
+	
+	if g.InputValidator != nil {
+		if err := g.InputValidator(inputJSON); err != nil {
+			return nil, nil, fmt.Errorf("input validation failed for goal '%s': %w", g.UID, err)
+		}
 	}
 
 	requestStartTime := float64(time.Now().UnixNano()) / 1e9
@@ -104,7 +111,13 @@ func RunRaw[I, R any](l *LLMangoManager, g *Goal, input *I) (*R, *openrouter.Non
 		Parameters: selectedPrompt.Parameters,
 	}
 
-	responseFormat, err := openrouter.UseOpenRouterJsonFormat(inputoutput.OutputExample, g.Title)
+	// Generate response format from output example
+	var outputExample R
+	if err := json.Unmarshal(g.OutputExample, &outputExample); err != nil {
+		return nil, nil, fmt.Errorf("failed to unmarshal output example for goal '%s': %w", g.UID, err)
+	}
+	
+	responseFormat, err := openrouter.UseOpenRouterJsonFormat(outputExample, g.Title)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to create JSON schema format: %w", err)
 	}
@@ -189,6 +202,28 @@ func RunRaw[I, R any](l *LLMangoManager, g *Goal, input *I) (*R, *openrouter.Non
 	}
 
 	content := *openrouterResponse.Choices[0].Message.Content
+	
+	// Validate output using the goal's validator
+	outputJSON := json.RawMessage(content)
+	if g.OutputValidator != nil {
+		if err := g.OutputValidator(outputJSON); err != nil {
+			logErr = fmt.Errorf("output validation failed for goal '%s': %w", g.UID, err)
+			if l.Logging != nil && l.Logging.LogResponse != nil {
+				logEntry, createLogErr := l.createLogObject(g.UID, selectedPrompt.UID, input, routerRequest, openrouterResponse, nil, requestTimeElapsed, selectedPrompt.IsCanary, logErr)
+				if createLogErr == nil {
+					go func(mangoLog *LLMangoLog) {
+						if logErr := l.Logging.LogResponse(mangoLog); logErr != nil {
+							log.Printf("Failed to log validation error response: %v", logErr)
+						}
+					}(logEntry)
+				} else {
+					log.Printf("Failed to create log object for validation error: %v", createLogErr)
+				}
+			}
+			return nil, nil, logErr
+		}
+	}
+	
 	if errUnmarshal := json.Unmarshal([]byte(content), &res); errUnmarshal != nil {
 		logErr = fmt.Errorf("failed to decode response content into target struct: %w, content: %s", errUnmarshal, content)
 		if l.Logging != nil && l.Logging.LogResponse != nil {

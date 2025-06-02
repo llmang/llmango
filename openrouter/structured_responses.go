@@ -7,22 +7,51 @@ import (
 )
 
 func PseudoStructuredResponseCleaner(response string) string {
-	// Find the first opening brace
+	// Find the first opening brace or bracket
 	firstBrace := strings.Index(response, "{")
-	if firstBrace == -1 {
-		// No JSON object found
+	firstBracket := strings.Index(response, "[")
+	
+	var firstChar int = -1
+	var isArray bool
+	
+	// Determine which comes first: { or [
+	if firstBrace != -1 && firstBracket != -1 {
+		if firstBrace < firstBracket {
+			firstChar = firstBrace
+			isArray = false
+		} else {
+			firstChar = firstBracket
+			isArray = true
+		}
+	} else if firstBrace != -1 {
+		firstChar = firstBrace
+		isArray = false
+	} else if firstBracket != -1 {
+		firstChar = firstBracket
+		isArray = true
+	} else {
+		// No JSON found
 		return response
 	}
 
-	// Find the last closing brace
-	lastBrace := strings.LastIndex(response, "}")
-	if lastBrace == -1 || lastBrace < firstBrace {
-		// No valid closing brace found
-		return response
+	// Find the corresponding closing character
+	var lastChar int
+	if isArray {
+		lastChar = strings.LastIndex(response, "]")
+		if lastChar == -1 || lastChar < firstChar {
+			// No valid closing bracket found
+			return response
+		}
+	} else {
+		lastChar = strings.LastIndex(response, "}")
+		if lastChar == -1 || lastChar < firstChar {
+			// No valid closing brace found
+			return response
+		}
 	}
 
-	// Extract only the content between the first { and last }
-	return response[firstBrace : lastBrace+1]
+	// Extract only the content between the first and last characters
+	return response[firstChar : lastChar+1]
 }
 
 // UseOpenRouterJsonFormat creates a JSON schema response format for OpenRouter requests

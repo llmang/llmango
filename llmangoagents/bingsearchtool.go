@@ -28,4 +28,5 @@ func (s *searchTool) Name() string {
 	return "search"
 }
 
-var BingSearchTool Tool = &searchTool{}
+// var BingSearchTool Tool = &searchTool{}
+// TODO: Implement proper Tool interface methods (lowercase) when tooling system is ready
