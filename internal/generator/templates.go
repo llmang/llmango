@@ -61,10 +61,6 @@ var {{.VarName}} = llmango.Goal{
 	UID:         "{{.UID}}",
 	Title:       "{{.Title}}",
 	Description: "{{.Description}}",
-	InputOutput: llmango.InputOutput[{{.InputType}}, {{.OutputType}}]{
-		InputExample:  {{.InputType}}{},
-		OutputExample: {{.OutputType}}{},
-	},
 }
 `
 
@@ -80,7 +76,7 @@ var {{.VarName}} = llmango.Prompt{
 	MaxRuns: {{.MaxRuns}},
 	Messages: []openrouter.Message{
 {{- range .Messages}}
-		{Role: "{{.Role}}", Content: "{{.Content}}"},
+		{Role: "{{.Role}}", Content: {{printf "%q" .Content}}},
 {{- end}}
 	},
 }
@@ -89,21 +85,21 @@ var {{.VarName}} = llmango.Prompt{
 // ParseTemplates parses all templates
 func ParseTemplates() (*template.Template, error) {
 	tmpl := template.New("mango")
-	
+
 	_, err := tmpl.New("mangoFile").Parse(mangoFileTemplate)
 	if err != nil {
 		return nil, err
 	}
-	
+
 	_, err = tmpl.New("configGoal").Parse(configGoalTemplate)
 	if err != nil {
 		return nil, err
 	}
-	
+
 	_, err = tmpl.New("configPrompt").Parse(configPromptTemplate)
 	if err != nil {
 		return nil, err
 	}
-	
+
 	return tmpl, nil
 }

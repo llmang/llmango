@@ -11,27 +11,41 @@ import (
 // ExecuteGoalWithDualPath executes a goal using the appropriate execution path
 // based on the model's capabilities (structured output vs universal compatibility)
 func (m *LLMangoManager) ExecuteGoalWithDualPath(goalUID string, input json.RawMessage) (json.RawMessage, error) {
+	log.Printf("🚀 ExecuteGoalWithDualPath: Starting execution for goal '%s'", goalUID)
+	log.Printf("📥 Input type: %T, length: %d bytes", input, len(input))
+	log.Printf("📥 Input content: %s", string(input))
+	
 	goal, exists := m.Goals.Get(goalUID)
 	if !exists {
+		log.Printf("❌ Goal '%s' not found in manager", goalUID)
 		return nil, fmt.Errorf("goal with UID '%s' not found", goalUID)
 	}
+	
+	log.Printf("✅ Found goal '%s': %s", goal.UID, goal.Title)
+	log.Printf("🎯 Goal has %d prompt UIDs: %v", len(goal.PromptUIDs), goal.PromptUIDs)
 
 	// Select prompt using existing logic
 	selectedPrompt, err := m.selectPromptForGoal(goal)
 	if err != nil {
+		log.Printf("❌ Failed to select prompt for goal '%s': %v", goalUID, err)
 		return nil, fmt.Errorf("failed to select prompt for goal '%s': %w", goalUID, err)
 	}
+	
+	log.Printf("✅ Selected prompt '%s' for model '%s'", selectedPrompt.UID, selectedPrompt.Model)
+	log.Printf("📝 Prompt has %d messages", len(selectedPrompt.Messages))
 
 	// Get model capabilities to determine execution path
 	capabilities := openrouter.GetModelCapabilities(selectedPrompt.Model)
 	
-	log.Printf("Executing goal '%s' with model '%s' (structured_output: %v)", 
-		goalUID, selectedPrompt.Model, capabilities.SupportsStructuredOutput)
+	log.Printf("🔍 Model capabilities for '%s': structured_output=%v",
+		selectedPrompt.Model, capabilities.SupportsStructuredOutput)
 
 	// Choose execution path based on model capabilities
 	if capabilities.SupportsStructuredOutput {
+		log.Printf("🎯 Using STRUCTURED OUTPUT path for goal '%s'", goalUID)
 		return m.executeWithStructuredOutput(goal, selectedPrompt, input)
 	} else {
+		log.Printf("🌐 Using UNIVERSAL COMPATIBILITY path for goal '%s'", goalUID)
 		return m.executeWithUniversalCompatibility(goal, selectedPrompt, input)
 	}
 }
@@ -39,19 +53,36 @@ func (m *LLMangoManager) ExecuteGoalWithDualPath(goalUID string, input json.RawM
 // executeWithStructuredOutput uses the existing structured output path
 // Enhanced with better error handling and fallback to universal path
 func (m *LLMangoManager) executeWithStructuredOutput(goal *Goal, prompt *Prompt, input json.RawMessage) (json.RawMessage, error) {
-	log.Printf("Using structured output path for goal '%s'", goal.UID)
+	log.Printf("🎯 executeWithStructuredOutput: Starting for goal '%s'", goal.UID)
 	
 	// Validate input using the goal's validator
 	if goal.InputValidator != nil {
+		log.Printf("🔍 Validating input using goal validator...")
 		if err := goal.InputValidator(input); err != nil {
+			log.Printf("❌ Input validation failed: %v", err)
 			return nil, fmt.Errorf("input validation failed for goal '%s': %w", goal.UID, err)
 		}
+		log.Printf("✅ Input validation passed")
+	} else {
+		log.Printf("⚠️ No input validator found for goal '%s'", goal.UID)
 	}
 
 	// Parse messages with input variables
+	log.Printf("📝 Parsing messages with input variables...")
+	log.Printf("📝 Original messages count: %d", len(prompt.Messages))
+	for i, msg := range prompt.Messages {
+		log.Printf("📝 Message %d [%s]: %s", i, msg.Role, msg.Content)
+	}
+	
 	updatedMessages, err := ParseMessages(input, prompt.Messages)
 	if err != nil {
+		log.Printf("❌ Failed to parse messages: %v", err)
 		return nil, fmt.Errorf("failed to update prompt messages: %w", err)
+	}
+	
+	log.Printf("✅ Successfully parsed messages, count: %d", len(updatedMessages))
+	for i, msg := range updatedMessages {
+		log.Printf("✅ Updated message %d [%s]: %s", i, msg.Role, msg.Content)
 	}
 
 	// Create router request

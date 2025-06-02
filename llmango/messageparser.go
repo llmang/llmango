@@ -30,31 +30,59 @@ func ParseMessageIfStatements(input any, messages []openrouter.Message) ([]openr
 
 	// Convert input to map of field names to values
 	inputMap := make(map[string]interface{})
+	
+	// Handle both struct input and json.RawMessage input
 	v := reflect.ValueOf(input)
 	if v.Kind() == reflect.Ptr {
 		v = v.Elem()
 	}
-	if v.Kind() != reflect.Struct {
-		return nil, fmt.Errorf("input must be a struct or pointer to struct")
+	
+	// Check if input is json.RawMessage ([]byte)
+	if v.Kind() == reflect.Slice && v.Type().Elem().Kind() == reflect.Uint8 {
+		// This is likely json.RawMessage, try to unmarshal to map
+		var jsonMap map[string]interface{}
+		var bytes []byte
+		var ok bool
+		
+		// Try json.RawMessage first, then []byte
+		if rawMsg, isRawMessage := input.(json.RawMessage); isRawMessage {
+			bytes = []byte(rawMsg)
+			ok = true
+		} else if byteSlice, isByteSlice := input.([]byte); isByteSlice {
+			bytes = byteSlice
+			ok = true
+		}
+		
+		if !ok {
+			return nil, fmt.Errorf("expected json.RawMessage or []byte input")
+		}
+		if err := json.Unmarshal(bytes, &jsonMap); err != nil {
+			return nil, fmt.Errorf("failed to unmarshal json.RawMessage input: %w", err)
+		}
+		inputMap = jsonMap
+	} else if v.Kind() != reflect.Struct {
+		return nil, fmt.Errorf("input must be a struct, pointer to struct, or json.RawMessage")
+	} else {
+		// Handle struct input (existing logic)
+		t := v.Type()
+		for i := 0; i < v.NumField(); i++ {
+			field := t.Field(i)
+			value := v.Field(i)
+			// Get JSON tag name, fall back to field name
+			tag := field.Tag.Get("json")
+			if tag == "" || tag == "-" {
+				tag = field.Name
+			} else {
+				// Handle json tag options like "omitempty"
+				if commaIdx := strings.Index(tag, ","); commaIdx != -1 {
+					tag = tag[:commaIdx]
+				}
+			}
+			// Store actual value, not just string representation
+			inputMap[tag] = value.Interface()
+		}
 	}
 
-	t := v.Type()
-	for i := 0; i < v.NumField(); i++ {
-		field := t.Field(i)
-		value := v.Field(i)
-		// Get JSON tag name, fall back to field name
-		tag := field.Tag.Get("json")
-		if tag == "" || tag == "-" {
-			tag = field.Name
-		} else {
-			// Handle json tag options like "omitempty"
-			if commaIdx := strings.Index(tag, ","); commaIdx != -1 {
-				tag = tag[:commaIdx]
-			}
-		}
-		// Store actual value, not just string representation
-		inputMap[tag] = value.Interface()
-	}
 
 	// Regex pattern to match {{#if varName}}...({{:else}}...)?{{/if}} blocks
 	// Group 1: Variable name
@@ -121,30 +149,60 @@ func ParseMessageIfStatements(input any, messages []openrouter.Message) ([]openr
 func InsertVariableValue(input any, varName string, content string) (string, error) {
 	// Convert input to map of field names to values
 	inputMap := make(map[string]string)
+	
+	// Handle both struct input and json.RawMessage input
 	v := reflect.ValueOf(input)
 	if v.Kind() == reflect.Ptr {
 		v = v.Elem()
 	}
-	if v.Kind() != reflect.Struct {
-		return content, fmt.Errorf("input must be a struct or pointer to struct")
-	}
-
-	t := v.Type()
-	for i := 0; i < v.NumField(); i++ {
-		field := t.Field(i)
-		value := v.Field(i)
-		// Get JSON tag name, fall back to field name
-		tag := field.Tag.Get("json")
-		if tag == "" || tag == "-" {
-			tag = field.Name
-		} else {
-			// Handle json tag options like "omitempty"
-			if commaIdx := strings.Index(tag, ","); commaIdx != -1 {
-				tag = tag[:commaIdx]
-			}
+	
+	// Check if input is json.RawMessage ([]byte)
+	if v.Kind() == reflect.Slice && v.Type().Elem().Kind() == reflect.Uint8 {
+		// This is likely json.RawMessage, try to unmarshal to map
+		var jsonMap map[string]interface{}
+		var bytes []byte
+		var ok bool
+		
+		// Try json.RawMessage first, then []byte
+		if rawMsg, isRawMessage := input.(json.RawMessage); isRawMessage {
+			bytes = []byte(rawMsg)
+			ok = true
+		} else if byteSlice, isByteSlice := input.([]byte); isByteSlice {
+			bytes = byteSlice
+			ok = true
 		}
-		// Convert value to string
-		inputMap[tag] = fmt.Sprintf("%v", value.Interface())
+		
+		if !ok {
+			return content, fmt.Errorf("expected json.RawMessage or []byte input")
+		}
+		if err := json.Unmarshal(bytes, &jsonMap); err != nil {
+			return content, fmt.Errorf("failed to unmarshal json.RawMessage input: %w", err)
+		}
+		// Convert to string map
+		for k, v := range jsonMap {
+			inputMap[k] = fmt.Sprintf("%v", v)
+		}
+	} else if v.Kind() != reflect.Struct {
+		return content, fmt.Errorf("input must be a struct, pointer to struct, or json.RawMessage")
+	} else {
+		// Handle struct input (existing logic)
+		t := v.Type()
+		for i := 0; i < v.NumField(); i++ {
+			field := t.Field(i)
+			value := v.Field(i)
+			// Get JSON tag name, fall back to field name
+			tag := field.Tag.Get("json")
+			if tag == "" || tag == "-" {
+				tag = field.Name
+			} else {
+				// Handle json tag options like "omitempty"
+				if commaIdx := strings.Index(tag, ","); commaIdx != -1 {
+					tag = tag[:commaIdx]
+				}
+			}
+			// Convert value to string
+			inputMap[tag] = fmt.Sprintf("%v", value.Interface())
+		}
 	}
 
 	// Check if varName exists in the map
@@ -159,30 +217,60 @@ func InsertVariableValue(input any, varName string, content string) (string, err
 func InsertVariableValuesIntoContent(input any, content string) (string, error) {
 	// Convert input to map of field names to values
 	inputMap := make(map[string]string)
+	
+	// Handle both struct input and json.RawMessage input
 	v := reflect.ValueOf(input)
 	if v.Kind() == reflect.Ptr {
 		v = v.Elem()
 	}
-	if v.Kind() != reflect.Struct {
-		return content, fmt.Errorf("input must be a struct or pointer to struct")
-	}
-
-	t := v.Type()
-	for i := 0; i < v.NumField(); i++ {
-		field := t.Field(i)
-		value := v.Field(i)
-		// Get JSON tag name, fall back to field name
-		tag := field.Tag.Get("json")
-		if tag == "" || tag == "-" {
-			tag = field.Name
-		} else {
-			// Handle json tag options like "omitempty"
-			if commaIdx := strings.Index(tag, ","); commaIdx != -1 {
-				tag = tag[:commaIdx]
-			}
+	
+	// Check if input is json.RawMessage ([]byte)
+	if v.Kind() == reflect.Slice && v.Type().Elem().Kind() == reflect.Uint8 {
+		// This is likely json.RawMessage, try to unmarshal to map
+		var jsonMap map[string]interface{}
+		var bytes []byte
+		var ok bool
+		
+		// Try json.RawMessage first, then []byte
+		if rawMsg, isRawMessage := input.(json.RawMessage); isRawMessage {
+			bytes = []byte(rawMsg)
+			ok = true
+		} else if byteSlice, isByteSlice := input.([]byte); isByteSlice {
+			bytes = byteSlice
+			ok = true
 		}
-		// Convert value to string
-		inputMap[tag] = fmt.Sprintf("%v", value.Interface())
+		
+		if !ok {
+			return content, fmt.Errorf("expected json.RawMessage or []byte input")
+		}
+		if err := json.Unmarshal(bytes, &jsonMap); err != nil {
+			return content, fmt.Errorf("failed to unmarshal json.RawMessage input: %w", err)
+		}
+		// Convert to string map
+		for k, v := range jsonMap {
+			inputMap[k] = fmt.Sprintf("%v", v)
+		}
+	} else if v.Kind() != reflect.Struct {
+		return content, fmt.Errorf("input must be a struct, pointer to struct, or json.RawMessage")
+	} else {
+		// Handle struct input (existing logic)
+		t := v.Type()
+		for i := 0; i < v.NumField(); i++ {
+			field := t.Field(i)
+			value := v.Field(i)
+			// Get JSON tag name, fall back to field name
+			tag := field.Tag.Get("json")
+			if tag == "" || tag == "-" {
+				tag = field.Name
+			} else {
+				// Handle json tag options like "omitempty"
+				if commaIdx := strings.Index(tag, ","); commaIdx != -1 {
+					tag = tag[:commaIdx]
+				}
+			}
+			// Convert value to string
+			inputMap[tag] = fmt.Sprintf("%v", value.Interface())
+		}
 	}
 
 	// Regex pattern to match {{variable}} but not /{{variable}}
@@ -209,33 +297,61 @@ func TryParseMessageArray(input any) ([]openrouter.Message, bool) {
 	if v.Kind() == reflect.Ptr {
 		v = v.Elem()
 	}
-	if v.Kind() != reflect.Struct {
-		return nil, false
-	}
 
 	var messagesJSON string
-
-	// Find insertMessages field
 	found := false
-	t := v.Type()
-	for i := 0; i < v.NumField(); i++ {
-		field := t.Field(i)
-		// Get JSON tag name
-		tag := field.Tag.Get("json")
-		if tag == "" || tag == "-" {
-			tag = field.Name
-		} else {
-			// Handle json tag options like "omitempty"
-			if commaIdx := strings.Index(tag, ","); commaIdx != -1 {
-				tag = tag[:commaIdx]
+
+	// Check if input is json.RawMessage ([]byte)
+	if v.Kind() == reflect.Slice && v.Type().Elem().Kind() == reflect.Uint8 {
+		// This is likely json.RawMessage, try to unmarshal to map
+		var jsonMap map[string]interface{}
+		var bytes []byte
+		var ok bool
+		
+		// Try json.RawMessage first, then []byte
+		if rawMsg, isRawMessage := input.(json.RawMessage); isRawMessage {
+			bytes = []byte(rawMsg)
+			ok = true
+		} else if byteSlice, isByteSlice := input.([]byte); isByteSlice {
+			bytes = byteSlice
+			ok = true
+		}
+		
+		if !ok {
+			return nil, false
+		}
+		if err := json.Unmarshal(bytes, &jsonMap); err != nil {
+			return nil, false
+		}
+		// Look for insertMessages field
+		if insertMsgs, ok := jsonMap["insertMessages"]; ok {
+			messagesJSON = fmt.Sprintf("%v", insertMsgs)
+			found = true
+		}
+	} else if v.Kind() == reflect.Struct {
+		// Handle struct input (existing logic)
+		t := v.Type()
+		for i := 0; i < v.NumField(); i++ {
+			field := t.Field(i)
+			// Get JSON tag name
+			tag := field.Tag.Get("json")
+			if tag == "" || tag == "-" {
+				tag = field.Name
+			} else {
+				// Handle json tag options like "omitempty"
+				if commaIdx := strings.Index(tag, ","); commaIdx != -1 {
+					tag = tag[:commaIdx]
+				}
+			}
+
+			if tag == "insertMessages" {
+				found = true
+				messagesJSON = fmt.Sprintf("%v", v.Field(i).Interface())
+				break
 			}
 		}
-
-		if tag == "insertMessages" {
-			found = true
-			messagesJSON = fmt.Sprintf("%v", v.Field(i).Interface())
-			break
-		}
+	} else {
+		return nil, false
 	}
 
 	if !found || messagesJSON == "" {
