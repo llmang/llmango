@@ -288,10 +288,10 @@ func (o *OpenRouter) executeOpenRouterRequest(request *OpenRouterRequest) ([]byt
 	if o.ApiKey == "" {
 		return nil, errors.New("API KEY is empty in openrouter instance")
 	}
-	
+
 	// Auto-configure provider requirements based on request content
 	request.autoConfigureProviderRequirements()
-	
+
 	// Ensure stream is not accidentally set for this helper
 	if request.Stream != nil && *request.Stream {
 		return nil, errors.New("executeOpenRouterRequest is for non-streaming requests; use GenerateStreamingChatResponse for streaming")

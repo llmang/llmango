@@ -1,25 +1,45 @@
 USE AT OWN RISK!!!!! VALIDATE ALL CODE BEFORE USAGE!!!
-# LLMang
+# LLMango
 [llmang.com](https://llmang.com)
 
 Hardcode Goals, Not Prompts
 
-Goal-driven LLM framework for Go. By [Carson](https://carsho.dev).
+Goal-driven LLM framework for Go with universal model compatibility. By [Carson](https://carsho.dev).
 
 ## What It Does
 
 Organizes LLM queries into Goals and Prompts. Focus on outcomes, not prompts.
 
-- **Goals**: Define the result.
-- **Prompts**: Model-specific inputs.
+- **Goals**: Define the desired result and structure
+- **Prompts**: Model-specific inputs with A/B testing support
+- **Universal Compatibility**: Works with any LLM, structured output or not
 
-## Features
+## Architecture
 
-- Type-safe Go structs.
-- Canary testing in production.
-- Handles logging, retries, rate limits.
-- Optional frontend UI.
-- Dynamic message templating with conditional blocks and variable replacement.
+LLMango consists of several integrated packages:
+
+### Core Packages ✅
+- [`llmango/`](llmango/) - Core goal-driven framework with dual-mode architecture
+- [`openrouter/`](openrouter/) - Universal LLM integration with dual-path execution
+- [`cmd/`](cmd/) - CLI tool for generating type-safe functions
+
+### Supporting Packages ✅
+- [`llmangofrontend/`](llmangofrontend/) - Web UI for goal and prompt management
+- [`llmangologger/`](llmangologger/) - Comprehensive logging with SQLite storage
+- [`llmangosavestate/`](llmangosavestate/) - Persistent state management
+- [`internal/`](internal/) - CLI implementation and code generation
+
+### In Development 🚧
+- [`llmangoagents/`](llmangoagents/) - Multi-agent system with tool support
+
+## Key Features
+
+- **Dual-Mode Goals**: Create goals using Go structs OR pure JSON
+- **Universal LLM Support**: Automatic routing for structured/non-structured models
+- **Type-Safe Generation**: CLI generates compile-time safe functions
+- **Advanced Templating**: Variable replacement, conditionals, message insertion
+- **Web Interface**: Optional frontend for goal/prompt management
+- **Comprehensive Logging**: SQLite-based execution tracking
 
 ## Message Parsing
 
