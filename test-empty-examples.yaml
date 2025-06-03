@@ -1,0 +1,19 @@
+# Test config with empty examples - should fail validation
+goals:
+  - uid: "test-empty"
+    title: "Test Empty Examples"
+    description: "This should fail validation"
+    input_type: "TestInput"
+    output_type: "TestOutput"
+    input_example: {}
+    output_example: {}
+
+prompts:
+  - uid: "test-prompt"
+    goal_uid: "test-empty"
+    model: "openai/gpt-4"
+    messages:
+      - role: "system"
+        content: "Test prompt"
+      - role: "user"
+        content: "Test: {{text}}"

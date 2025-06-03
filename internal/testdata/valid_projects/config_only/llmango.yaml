@@ -1,0 +1,17 @@
+goals:
+  - uid: "config-goal"
+    title: "Config Goal"
+    description: "A goal defined in configuration"
+    input_type: "ConfigInput"
+    output_type: "ConfigOutput"
+
+prompts:
+  - uid: "config-prompt"
+    goal_uid: "config-goal"
+    model: "openai/gpt-3.5-turbo"
+    weight: 50
+    messages:
+      - role: "system"
+        content: "You are a configuration-based assistant."
+      - role: "user"
+        content: "Process: {{input}}"
