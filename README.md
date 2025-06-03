@@ -1,7 +1,5 @@
+USE AT OWN RISK!!!!! VALIDATE ALL CODE BEFORE USAGE!!!
 # LLMang
-
-WARNING: this is a WIP, I do not recommend using this at this stage!!!
-
 [llmang.com](https://llmang.com)
 
 Hardcode Goals, Not Prompts
@@ -143,5 +141,5 @@ router.Handle("/mango/", http.StripPrefix("/mango", middleware.AdminDevEnv(mango
 ```
 
 ## Install
-
-~~go get github.com/llmang/llmango~~
+USE AT OWN RISK!!!!!
+go get github.com/llmang/llmango
