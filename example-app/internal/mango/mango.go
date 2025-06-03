@@ -11,15 +11,6 @@ import (
 
 // Config-generated goals and prompts
 
-// sentimentAnalysisGoal is generated from configuration
-var sentimentAnalysisGoal = llmango.Goal{
-	UID:         "sentiment-analysis",
-	Title:       "Sentiment Analysis",
-	Description: "Analyzes the sentiment of text input",
-	InputExample:  json.RawMessage(`{}`),
-	OutputExample: json.RawMessage(`{}`),
-}
-
 // textSummaryGoal is generated from configuration
 var textSummaryGoal = llmango.Goal{
 	UID:         "text-summary",
@@ -47,18 +38,13 @@ var languageDetectionGoal = llmango.Goal{
 	OutputExample: json.RawMessage(`{"confidence":0.98,"language":"French","language_code":"fr"}`),
 }
 
-// sentimentStructuredPrompt is generated from configuration
-var sentimentStructuredPrompt = llmango.Prompt{
-	UID:      "sentiment-structured",
-	GoalUID:  "sentiment-analysis",
-	Model:    "openai/gpt-4",
-	Weight:   100,
-	IsCanary: false,
-	MaxRuns:  0,
-	Messages: []openrouter.Message{
-		{Role: "system", Content: "You are a sentiment analysis expert. Analyze the sentiment of the given text and provide a confidence score."},
-		{Role: "user", Content: "Analyze the sentiment of this text: {{text}}"},
-	},
+// sentimentAnalysisGoal is generated from configuration
+var sentimentAnalysisGoal = llmango.Goal{
+	UID:         "sentiment-analysis",
+	Title:       "Sentiment Analysis",
+	Description: "Analyzes the sentiment of text input",
+	InputExample:  json.RawMessage(`{}`),
+	OutputExample: json.RawMessage(`{}`),
 }
 
 // summaryStructuredPrompt is generated from configuration
@@ -159,6 +145,20 @@ var summaryUniversalPrompt = llmango.Prompt{
 	},
 }
 
+// sentimentStructuredPrompt is generated from configuration
+var sentimentStructuredPrompt = llmango.Prompt{
+	UID:      "sentiment-structured",
+	GoalUID:  "sentiment-analysis",
+	Model:    "openai/gpt-4",
+	Weight:   100,
+	IsCanary: false,
+	MaxRuns:  0,
+	Messages: []openrouter.Message{
+		{Role: "system", Content: "You are a sentiment analysis expert. Analyze the sentiment of the given text and provide a confidence score."},
+		{Role: "user", Content: "Analyze the sentiment of this text: {{text}}"},
+	},
+}
+
 type Mango struct {
 	*llmango.LLMangoManager
 }
@@ -171,15 +171,14 @@ func CreateMango(or *openrouter.OpenRouter) (*Mango, error) {
 
 	// Initialize goals
 	llmangoManager.AddGoals(
-		&sentimentAnalysisGoal,
 		&textSummaryGoal,
 		&emailClassificationGoal,
 		&languageDetectionGoal,
+		&sentimentAnalysisGoal,
 	)
 
 	// Initialize prompts
 	llmangoManager.AddPrompts(
-		&sentimentStructuredPrompt,
 		&summaryStructuredPrompt,
 		&emailClassificationOpenaiPrompt,
 		&emailClassificationClaudePrompt,
@@ -187,21 +186,12 @@ func CreateMango(or *openrouter.OpenRouter) (*Mango, error) {
 		&languageDetectionLlamaPrompt,
 		&sentimentUniversalPrompt,
 		&summaryUniversalPrompt,
+		&sentimentStructuredPrompt,
 	)
 
 	return &Mango{llmangoManager}, nil
 }
 
-
-// SentimentAnalysis executes the Sentiment Analysis goal
-func (m *Mango) SentimentAnalysis(input *SentimentInput) (*SentimentOutput, error) {
-	return llmango.Run[SentimentInput, SentimentOutput](m.LLMangoManager, &sentimentAnalysisGoal, input)
-}
-
-// SentimentAnalysisRaw executes the Sentiment Analysis goal and returns the raw OpenRouter response
-func (m *Mango) SentimentAnalysisRaw(input *SentimentInput) (*SentimentOutput, *openrouter.NonStreamingChatResponse, error) {
-	return llmango.RunRaw[SentimentInput, SentimentOutput](m.LLMangoManager, &sentimentAnalysisGoal, input)
-}
 
 // TextSummary executes the Text Summary goal
 func (m *Mango) TextSummary(input *SummaryInput) (*SummaryOutput, error) {
@@ -231,4 +221,14 @@ func (m *Mango) LanguageDetection(input *LanguageInput) (*LanguageOutput, error)
 // LanguageDetectionRaw executes the Language Detection goal and returns the raw OpenRouter response
 func (m *Mango) LanguageDetectionRaw(input *LanguageInput) (*LanguageOutput, *openrouter.NonStreamingChatResponse, error) {
 	return llmango.RunRaw[LanguageInput, LanguageOutput](m.LLMangoManager, &languageDetectionGoal, input)
+}
+
+// SentimentAnalysis executes the Sentiment Analysis goal
+func (m *Mango) SentimentAnalysis(input *SentimentInput) (*SentimentOutput, error) {
+	return llmango.Run[SentimentInput, SentimentOutput](m.LLMangoManager, &sentimentAnalysisGoal, input)
+}
+
+// SentimentAnalysisRaw executes the Sentiment Analysis goal and returns the raw OpenRouter response
+func (m *Mango) SentimentAnalysisRaw(input *SentimentInput) (*SentimentOutput, *openrouter.NonStreamingChatResponse, error) {
+	return llmango.RunRaw[SentimentInput, SentimentOutput](m.LLMangoManager, &sentimentAnalysisGoal, input)
 }

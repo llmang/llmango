@@ -25,8 +25,8 @@ type-safe wrapper functions.`,
 		},
 	}
 
-	cmd.Flags().StringVarP(&opts.InputDir, "input", "i", ".", "Input directory to scan for goals and prompts")
-	cmd.Flags().StringVarP(&opts.OutputFile, "output", "o", "mango.go", "Output file path")
+	cmd.Flags().StringVarP(&opts.InputDir, "input", "i", "", "Input directory to scan for goals and prompts (default: mango if exists, otherwise current directory)")
+	cmd.Flags().StringVarP(&opts.OutputFile, "output", "o", "", "Output file path (default: mango/mango.go if mango dir exists, otherwise mango.go)")
 	cmd.Flags().StringVarP(&opts.ConfigFile, "config", "c", "", "Specific config file to use (optional)")
 	cmd.Flags().StringVarP(&opts.PackageName, "package", "p", "mango", "Package name for generated code")
 	cmd.Flags().BoolVar(&opts.Validate, "validate", false, "Validate only, don't generate code")
@@ -36,6 +36,11 @@ type-safe wrapper functions.`,
 
 // runGenerate executes the generate command
 func runGenerate(opts *parser.GenerateOptions) error {
+	// Set smart defaults based on project structure
+	if err := setSmartDefaults(opts); err != nil {
+		return err
+	}
+
 	// Ensure input directory exists
 	if _, err := os.Stat(opts.InputDir); os.IsNotExist(err) {
 		return fmt.Errorf("input directory does not exist: %s", opts.InputDir)
@@ -90,7 +95,7 @@ func runGenerate(opts *parser.GenerateOptions) error {
 
 	// Generate code
 	fmt.Printf("Generating code to %s...\n", opts.OutputFile)
-	
+
 	// Ensure output directory exists
 	outputDir := filepath.Dir(opts.OutputFile)
 	if err := os.MkdirAll(outputDir, 0755); err != nil {
@@ -103,5 +108,39 @@ func runGenerate(opts *parser.GenerateOptions) error {
 	}
 
 	fmt.Printf("Successfully generated %s\n", opts.OutputFile)
+	return nil
+}
+
+// setSmartDefaults sets intelligent defaults based on project structure
+func setSmartDefaults(opts *parser.GenerateOptions) error {
+	// Set input directory default
+	if opts.InputDir == "" {
+		// Check for mango directories in common locations
+		mangoDirs := []string{"mango", "internal/mango", "./mango", "./internal/mango"}
+		found := false
+		for _, dir := range mangoDirs {
+			if _, err := os.Stat(dir); err == nil {
+				opts.InputDir = "." // Scan current directory which contains the mango folder
+				found = true
+				break
+			}
+		}
+		if !found {
+			opts.InputDir = "."
+		}
+	}
+
+	// Set output file default
+	if opts.OutputFile == "" {
+		// Check for mango directories for output location
+		if _, err := os.Stat("mango"); err == nil {
+			opts.OutputFile = "mango/mango.go"
+		} else if _, err := os.Stat("internal/mango"); err == nil {
+			opts.OutputFile = "internal/mango/mango.go"
+		} else {
+			opts.OutputFile = "mango.go"
+		}
+	}
+
 	return nil
 }
