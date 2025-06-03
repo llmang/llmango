@@ -1,2 +1,9 @@
 assets
 .env
+/example-app/example-app
+
+assets/
+
+./assetes/
+/assets/*
+assets/*
