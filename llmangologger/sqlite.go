@@ -196,3 +196,29 @@ func UseSQLiteLogging(m *llmango.LLMangoManager, db *sql.DB, opts *MangoLoggingO
 
 	return nil
 }
+
+// CreateSQLiteLogger creates a SQLite logger that can be used with WithLogging()
+func CreateSQLiteLogger(db *sql.DB, logFullRequests bool) (*llmango.Logging, error) {
+	if db == nil {
+		return nil, errors.New("database connection cannot be nil")
+	}
+
+	err := setupSQLiteDB(db)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create logging table: %w", err)
+	}
+
+	return &llmango.Logging{
+		LogResponse: func(mangolog *llmango.LLMangoLog) error {
+			logToInsert := *mangolog
+			if !logFullRequests {
+				logToInsert.RawRequest = ""
+				logToInsert.RawResponse = ""
+			}
+			return sqlite3LogObject(db, &logToInsert)
+		},
+		GetLogs: func(filter *llmango.LLmangoLogFilter) ([]llmango.LLMangoLog, int, error) {
+			return sqlite3GetLogs(db, filter)
+		},
+	}, nil
+}

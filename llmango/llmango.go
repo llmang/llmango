@@ -24,12 +24,17 @@ type LLMangoManager struct {
 }
 
 func CreateLLMangoManger(o *openrouter.OpenRouter) (*LLMangoManager, error) {
-	// defaultFileName := "llmango.json"
 	return &LLMangoManager{
 		OpenRouter: o,
 		Prompts:    concurrentmap.SyncedMap[string, *Prompt]{},
 		Goals:      concurrentmap.SyncedMap[string, *Goal]{},
 	}, nil
+}
+
+// WithLogging sets up logging for the LLMangoManager using the fluent interface pattern
+func (m *LLMangoManager) WithLogging(logger *Logging) *LLMangoManager {
+	m.Logging = logger
+	return m
 }
 
 type Prompt struct {

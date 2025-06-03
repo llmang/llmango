@@ -5,12 +5,28 @@ goals:
     description: "Analyzes the sentiment of text input"
     input_type: "SentimentInput"
     output_type: "SentimentOutput"
+    input_example:
+      text: "I absolutely love this new AI system! It's incredibly helpful and makes my work so much easier."
+    output_example:
+      sentiment: "positive"
+      confidence: 0.95
+      reasoning: "Contains positive language like 'love', 'incredibly helpful', and 'easier'"
     
   - uid: "text-summary"
     title: "Text Summary"
     description: "Summarizes long text into key points"
     input_type: "SummaryInput"
     output_type: "SummaryOutput"
+    input_example:
+      text: "Artificial intelligence (AI) is transforming industries worldwide. From healthcare to finance, AI systems are automating complex tasks, improving efficiency, and enabling new capabilities. Machine learning algorithms can now process vast amounts of data to identify patterns and make predictions. However, the rapid advancement of AI also raises important questions about ethics, job displacement, and the need for proper regulation. As we move forward, it's crucial to balance innovation with responsible development to ensure AI benefits society as a whole."
+    output_example:
+      summary: "AI is transforming industries by automating tasks and improving efficiency, but raises important questions about ethics and regulation that need to be addressed."
+      key_points:
+        - "AI systems are automating complex tasks across industries"
+        - "Machine learning processes data to identify patterns and make predictions"
+        - "Rapid AI advancement raises ethics and job displacement concerns"
+        - "Need for proper regulation and responsible development"
+      word_count: 150
 
   # Config-based goals (these will be generated from config, not Go code)
   - uid: "email-classification"

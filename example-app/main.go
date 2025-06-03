@@ -9,28 +9,28 @@ import (
 	"os"
 
 	"github.com/joho/godotenv"
-	"github.com/llmang/llmango/llmango"
+	"github.com/llmang/llmango/llmangologger"
 	"github.com/llmang/llmango/openrouter"
+
+	"github.com/llmang/llmango/example-app/internal/mango"
 )
 
 type TestEndpoint struct {
 	Name         string `json:"name"`
 	Path         string `json:"path"`
-	GoalUID      string `json:"goalUID"`
-	Model        string `json:"model"`
+	Method       string `json:"method"`
 	Description  string `json:"description"`
-	IsStructured bool   `json:"isStructured"`
+	InputExample string `json:"inputExample"`
 }
 
 type TestResponse struct {
 	Success  bool   `json:"success"`
 	Response string `json:"response"`
 	Error    string `json:"error,omitempty"`
-	Model    string `json:"model"`
-	Path     string `json:"path"`
+	Method   string `json:"method"`
 }
 
-var manager *llmango.LLMangoManager
+var mangoClient *mango.Mango
 var endpoints []TestEndpoint
 
 func main() {
@@ -50,249 +50,59 @@ func main() {
 		log.Fatal("Failed to create OpenRouter:", err)
 	}
 
-	// Initialize LLMango Manager
-	manager, err = llmango.CreateLLMangoManger(openRouter)
+	// Initialize CLI-generated Mango client with logging
+	mangoClient, err = mango.CreateMango(openRouter)
 	if err != nil {
-		log.Fatal("Failed to create LLMango Manager:", err)
+		log.Fatal("Failed to create Mango client:", err)
 	}
 
-	// Setup test goals and prompts
-	setupTestData()
+	// Enable logging with print logger (logs input/output objects only)
+	// For full request/response logging, use: llmangologger.CreatePrintLogger(true)
+	mangoClient.WithLogging(llmangologger.CreatePrintLogger(true))
+
+	// Setup test endpoints using CLI-generated methods
+	setupTestEndpoints()
 
 	// Setup HTTP routes
 	http.HandleFunc("/", handleHome)
 	http.HandleFunc("/api/test/", handleTestEndpoint)
 
-	fmt.Println("🚀 LLMango Dual-Path Test Server starting on http://localhost:8080")
+	fmt.Println("🚀 LLMango CLI-Generated Test Server starting on http://localhost:8080")
 	fmt.Println("📝 Make sure to set OPENROUTER_API_KEY in your .env file")
+	fmt.Println("🔧 Testing CLI-generated goals and methods")
 	log.Fatal(http.ListenAndServe(":8080", nil))
 }
 
-func setupTestData() {
-	// 1. Create JSON Goals (Frontend/Dynamic style)
-	sentimentInputJSON := json.RawMessage(`{"text": "I love this new product!"}`)
-	sentimentOutputJSON := json.RawMessage(`{"sentiment": "positive", "confidence": 0.95, "reasoning": "Contains positive language"}`)
-
-	jsonGoal := llmango.NewJSONGoal(
-		"sentiment-json",
-		"Sentiment Analysis (JSON)",
-		"Analyzes sentiment using JSON goal",
-		sentimentInputJSON,
-		sentimentOutputJSON,
-	)
-
-	// 2. Create Typed Goals (Developer style)
-	type SummaryInput struct {
-		Text string `json:"text"`
-	}
-	type SummaryOutput struct {
-		Summary   string   `json:"summary"`
-		KeyPoints []string `json:"key_points"`
-		WordCount int      `json:"word_count"`
-	}
-
-	typedGoal := llmango.NewGoal(
-		"summary-typed",
-		"Text Summary (Typed)",
-		"Summarizes text using typed goal",
-		SummaryInput{Text: "Long text to summarize..."},
-		SummaryOutput{
-			Summary:   "Brief summary",
-			KeyPoints: []string{"Point 1", "Point 2"},
-			WordCount: 150,
-		},
-	)
-
-	// Add goals to manager
-	manager.AddGoals(jsonGoal, typedGoal)
-
-	// 3. Create Prompts for Structured Models (OpenAI GPT-4)
-	structuredSentimentPrompt := &llmango.Prompt{
-		UID:     "sentiment-structured",
-		GoalUID: "sentiment-json",
-		Model:   "openai/gpt-4",
-		Weight:  100,
-		Messages: []openrouter.Message{
-			{Role: "system", Content: "You are a sentiment analysis expert. Analyze the sentiment of the given text."},
-			{Role: "user", Content: "Analyze the sentiment of this text: {{text}}"},
-		},
-		Parameters: openrouter.Parameters{
-			Temperature: &[]float64{0.3}[0],
-		},
-	}
-
-	structuredSummaryPrompt := &llmango.Prompt{
-		UID:     "summary-structured",
-		GoalUID: "summary-typed",
-		Model:   "openai/gpt-3.5-turbo",
-		Weight:  100,
-		Messages: []openrouter.Message{
-			{Role: "system", Content: "You are a text summarization expert. Create concise summaries with key points."},
-			{Role: "user", Content: "Summarize this text: {{text}}"},
-		},
-		Parameters: openrouter.Parameters{
-			Temperature: &[]float64{0.5}[0],
-		},
-	}
-
-	// 4. Create Prompts for Universal Models (Anthropic Claude)
-	universalSentimentPrompt := &llmango.Prompt{
-		UID:     "sentiment-universal",
-		GoalUID: "sentiment-json",
-		Model:   "anthropic/claude-3-sonnet",
-		Weight:  100,
-		Messages: []openrouter.Message{
-			{Role: "system", Content: "You are a sentiment analysis expert. Analyze the sentiment of the given text."},
-			{Role: "user", Content: "Analyze the sentiment of this text: {{text}}"},
-		},
-		Parameters: openrouter.Parameters{
-			Temperature: &[]float64{0.3}[0],
-		},
-	}
-
-	universalSummaryPrompt := &llmango.Prompt{
-		UID:     "summary-universal",
-		GoalUID: "summary-typed",
-		Model:   "meta-llama/llama-3.1-405b-instruct",
-		Weight:  100,
-		Messages: []openrouter.Message{
-			{Role: "system", Content: "You are a text summarization expert. Create concise summaries with key points."},
-			{Role: "user", Content: "Summarize this text: {{text}}"},
-		},
-		Parameters: openrouter.Parameters{
-			Temperature: &[]float64{0.5}[0],
-		},
-	}
-
-	// 5. Create Additional Prompts for More Model Testing
-	mistralSentimentPrompt := &llmango.Prompt{
-		UID:     "sentiment-mistral",
-		GoalUID: "sentiment-json",
-		Model:   "mistralai/mistral-large",
-		Weight:  100,
-		Messages: []openrouter.Message{
-			{Role: "system", Content: "You are a sentiment analysis expert. Analyze the sentiment of the given text."},
-			{Role: "user", Content: "Analyze the sentiment of this text: {{text}}"},
-		},
-		Parameters: openrouter.Parameters{
-			Temperature: &[]float64{0.3}[0],
-		},
-	}
-
-	cohereSummaryPrompt := &llmango.Prompt{
-		UID:     "summary-cohere",
-		GoalUID: "summary-typed",
-		Model:   "cohere/command-r",
-		Weight:  100,
-		Messages: []openrouter.Message{
-			{Role: "system", Content: "You are a text summarization expert. Create concise summaries with key points."},
-			{Role: "user", Content: "Summarize this text: {{text}}"},
-		},
-		Parameters: openrouter.Parameters{
-			Temperature: &[]float64{0.5}[0],
-		},
-	}
-
-	gpt4oMiniPrompt := &llmango.Prompt{
-		UID:     "sentiment-gpt4o-mini",
-		GoalUID: "sentiment-json",
-		Model:   "openai/gpt-4o-mini",
-		Weight:  100,
-		Messages: []openrouter.Message{
-			{Role: "system", Content: "You are a sentiment analysis expert. Analyze the sentiment of the given text."},
-			{Role: "user", Content: "Analyze the sentiment of this text: {{text}}"},
-		},
-		Parameters: openrouter.Parameters{
-			Temperature: &[]float64{0.3}[0],
-		},
-	}
-
-	// Add prompts to manager
-	manager.AddPrompts(
-		structuredSentimentPrompt,
-		structuredSummaryPrompt,
-		universalSentimentPrompt,
-		universalSummaryPrompt,
-		mistralSentimentPrompt,
-		cohereSummaryPrompt,
-		gpt4oMiniPrompt,
-	)
-
-	// 6. Setup test endpoints
+func setupTestEndpoints() {
 	endpoints = []TestEndpoint{
 		{
-			Name:         "🔧 Sentiment (GPT-4)",
-			Path:         "sentiment-structured",
-			GoalUID:      "sentiment-json",
-			Model:        "openai/gpt-4",
-			Description:  "JSON Goal + Structured Output Model",
-			IsStructured: true,
+			Name:         "📝 Text Summary",
+			Path:         "text-summary",
+			Method:       "TextSummary",
+			Description:  "CLI-generated text summarization using TextSummary() method",
+			InputExample: `{"text": "Artificial intelligence (AI) is transforming industries worldwide. From healthcare to finance, AI systems are automating complex tasks, improving efficiency, and enabling new capabilities. Machine learning algorithms can now process vast amounts of data to identify patterns and make predictions. However, the rapid advancement of AI also raises important questions about ethics, job displacement, and the need for proper regulation. As we move forward, it's crucial to balance innovation with responsible development to ensure AI benefits society as a whole."}`,
 		},
 		{
-			Name:         "🔧 Sentiment (GPT-4o Mini)",
-			Path:         "sentiment-gpt4o-mini",
-			GoalUID:      "sentiment-json",
-			Model:        "openai/gpt-4o-mini",
-			Description:  "JSON Goal + Structured Output Model (Fast)",
-			IsStructured: true,
+			Name:         "💭 Sentiment Analysis",
+			Path:         "sentiment-analysis",
+			Method:       "SentimentAnalysis",
+			Description:  "CLI-generated sentiment analysis using SentimentAnalysis() method",
+			InputExample: `{"text": "I absolutely love this new AI system! It's incredibly helpful and makes my work so much easier."}`,
 		},
 		{
-			Name:         "🌍 Sentiment (Claude)",
-			Path:         "sentiment-universal",
-			GoalUID:      "sentiment-json",
-			Model:        "anthropic/claude-3-sonnet",
-			Description:  "JSON Goal + Universal Compatibility Model",
-			IsStructured: false,
+			Name:         "📧 Email Classification",
+			Path:         "email-classification",
+			Method:       "EmailClassification",
+			Description:  "CLI-generated email classification using EmailClassification() method",
+			InputExample: `{"subject": "Limited Time Offer - 50% Off Everything!", "body": "Don't miss out on our biggest sale of the year! Click here to shop now.", "sender": "sales@example.com"}`,
 		},
 		{
-			Name:         "🌍 Sentiment (Mistral)",
-			Path:         "sentiment-mistral",
-			GoalUID:      "sentiment-json",
-			Model:        "mistralai/mistral-large",
-			Description:  "JSON Goal + Universal Compatibility Model",
-			IsStructured: false,
+			Name:         "🌍 Language Detection",
+			Path:         "language-detection",
+			Method:       "LanguageDetection",
+			Description:  "CLI-generated language detection using LanguageDetection() method",
+			InputExample: `{"text": "Bonjour, comment allez-vous aujourd'hui? J'espère que vous passez une excellente journée!"}`,
 		},
-		{
-			Name:         "🔧 Summary (GPT-3.5)",
-			Path:         "summary-structured",
-			GoalUID:      "summary-typed",
-			Model:        "openai/gpt-3.5-turbo",
-			Description:  "Typed Goal + Structured Output Model",
-			IsStructured: true,
-		},
-		{
-			Name:         "🌍 Summary (Llama)",
-			Path:         "summary-universal",
-			GoalUID:      "summary-typed",
-			Model:        "meta-llama/llama-3.1-405b-instruct",
-			Description:  "Typed Goal + Universal Compatibility Model",
-			IsStructured: false,
-		},
-		{
-			Name:         "🌍 Summary (Cohere)",
-			Path:         "summary-cohere",
-			GoalUID:      "summary-typed",
-			Model:        "cohere/command-r",
-			Description:  "Typed Goal + Universal Compatibility Model",
-			IsStructured: false,
-		},
-	}
-
-	// Update goal prompt UIDs to include all prompts for comprehensive testing
-	if goal, exists := manager.Goals.Get("sentiment-json"); exists {
-		goal.PromptUIDs = []string{
-			"sentiment-structured",
-			"sentiment-universal",
-			"sentiment-mistral",
-			"sentiment-gpt4o-mini",
-		}
-	}
-	if goal, exists := manager.Goals.Get("summary-typed"); exists {
-		goal.PromptUIDs = []string{
-			"summary-structured",
-			"summary-universal",
-			"summary-cohere",
-		}
 	}
 }
 
@@ -301,21 +111,18 @@ func handleHome(w http.ResponseWriter, r *http.Request) {
 <!DOCTYPE html>
 <html>
 <head>
-    <title>LLMango Dual-Path Test</title>
+    <title>LLMango CLI-Generated Test</title>
     <style>
         body { font-family: Arial, sans-serif; margin: 20px; background: #f5f5f5; }
         .container { max-width: 1200px; margin: 0 auto; }
         .header { background: #2c3e50; color: white; padding: 20px; border-radius: 8px; margin-bottom: 20px; }
-        .endpoint { background: white; margin: 10px 0; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .endpoint { background: white; margin: 10px 0; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); border-left: 4px solid #3498db; }
         .endpoint h3 { margin: 0 0 10px 0; color: #2c3e50; }
         .endpoint .description { color: #7f8c8d; margin-bottom: 15px; }
-        .endpoint .model-info { background: #ecf0f1; padding: 10px; border-radius: 4px; margin-bottom: 15px; font-size: 14px; }
-        .structured { border-left: 4px solid #27ae60; }
-        .universal { border-left: 4px solid #e74c3c; }
+        .endpoint .method-info { background: #ecf0f1; padding: 10px; border-radius: 4px; margin-bottom: 15px; font-size: 14px; }
         .input-group { margin-bottom: 15px; }
         .input-group label { display: block; margin-bottom: 5px; font-weight: bold; }
-        .input-group input, .input-group textarea { width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px; }
-        .input-group textarea { height: 80px; resize: vertical; }
+        .input-group textarea { width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px; height: 120px; resize: vertical; font-family: monospace; }
         .test-btn { background: #3498db; color: white; padding: 10px 20px; border: none; border-radius: 4px; cursor: pointer; }
         .test-btn:hover { background: #2980b9; }
         .test-btn:disabled { background: #bdc3c7; cursor: not-allowed; }
@@ -325,35 +132,34 @@ func handleHome(w http.ResponseWriter, r *http.Request) {
         .response-header { font-weight: bold; margin-bottom: 10px; }
         .response-content { background: white; padding: 10px; border-radius: 4px; font-family: monospace; white-space: pre-wrap; }
         .loading { color: #f39c12; }
-        .badge { display: inline-block; padding: 4px 8px; border-radius: 4px; font-size: 12px; font-weight: bold; }
-        .badge.structured { background: #27ae60; color: white; }
-        .badge.universal { background: #e74c3c; color: white; }
+        .badge { display: inline-block; padding: 4px 8px; border-radius: 4px; font-size: 12px; font-weight: bold; background: #3498db; color: white; }
     </style>
 </head>
 <body>
     <div class="container">
         <div class="header">
-            <h1> 🚀 LLMango Dual-Path Execution Test</h1>
-            <p>Test both structured output and universal compatibility execution paths</p>
+            <h1>🚀 LLMango CLI-Generated Test</h1>
+            <p>Testing CLI-generated goals and methods from mango.go</p>
+            <p><strong>Generated from:</strong> llmango.yaml + internal/mango/example.go</p>
         </div>
 
         {{range .}}
-        <div class="endpoint {{if .IsStructured}}structured{{else}}universal{{end}}">
-            <h3>{{.Name}} <span class="badge {{if .IsStructured}}structured{{else}}universal{{end}}">{{if .IsStructured}}STRUCTURED{{else}}UNIVERSAL{{end}}</span></h3>
+        <div class="endpoint">
+            <h3>{{.Name}} <span class="badge">CLI-GENERATED</span></h3>
             <div class="description">{{.Description}}</div>
-            <div class="model-info">
-                <strong>Model:</strong> {{.Model}} | 
-                <strong>Goal:</strong> {{.GoalUID}} | 
-                <strong>Path:</strong> {{if .IsStructured}}Structured Output{{else}}Universal Prompts{{end}}
+            <div class="method-info">
+                <strong>Method:</strong> mango.{{.Method}}() | 
+                <strong>Path:</strong> {{.Path}} | 
+                <strong>Source:</strong> CLI-generated from config + Go types
             </div>
             
             <div class="input-group">
-                <label for="input-{{.Path}}">Input Text:</label>
-                <textarea id="input-{{.Path}}" placeholder="Enter text to process...">I absolutely love this new AI system! It's incredibly helpful and easy to use.</textarea>
+                <label for="input-{{.Path}}">Input JSON:</label>
+                <textarea id="input-{{.Path}}" placeholder="Enter JSON input...">{{.InputExample}}</textarea>
             </div>
             
-            <button class="test-btn" onclick="testEndpoint('{{.Path}}', '{{.GoalUID}}')">
-                🧪 Test {{.Name}}
+            <button class="test-btn" onclick="testEndpoint('{{.Path}}', '{{.Method}}')">
+                🧪 Test {{.Method}}()
             </button>
             
             <div id="response-{{.Path}}" class="response" style="display: none;"></div>
@@ -362,14 +168,22 @@ func handleHome(w http.ResponseWriter, r *http.Request) {
     </div>
 
     <script>
-        async function testEndpoint(path, goalUID) {
+        async function testEndpoint(path, method) {
             const inputElement = document.getElementById('input-' + path);
             const responseElement = document.getElementById('response-' + path);
             const button = document.querySelector('button[onclick*="' + path + '"]');
             
             const inputText = inputElement.value.trim();
             if (!inputText) {
-                alert('Please enter some text to process');
+                alert('Please enter some JSON input');
+                return;
+            }
+            
+            // Validate JSON
+            try {
+                JSON.parse(inputText);
+            } catch (e) {
+                alert('Invalid JSON: ' + e.message);
                 return;
             }
             
@@ -378,13 +192,13 @@ func handleHome(w http.ResponseWriter, r *http.Request) {
             button.textContent = '⏳ Processing...';
             responseElement.style.display = 'block';
             responseElement.className = 'response loading';
-            responseElement.innerHTML = '<div class="response-header">🔄 Processing request...</div>';
+            responseElement.innerHTML = '<div class="response-header">🔄 Calling ' + method + '()...</div>';
             
             try {
                 const response = await fetch('/api/test/' + path, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ text: inputText })
+                    body: inputText
                 });
                 
                 const result = await response.json();
@@ -392,12 +206,12 @@ func handleHome(w http.ResponseWriter, r *http.Request) {
                 if (result.success) {
                     responseElement.className = 'response success';
                     responseElement.innerHTML = 
-                        '<div class="response-header">✅ Success - ' + result.model + '</div>' +
+                        '<div class="response-header">✅ Success - ' + result.method + '()</div>' +
                         '<div class="response-content">' + result.response + '</div>';
                 } else {
                     responseElement.className = 'response error';
                     responseElement.innerHTML = 
-                        '<div class="response-header">❌ Error - ' + result.model + '</div>' +
+                        '<div class="response-header">❌ Error - ' + result.method + '()</div>' +
                         '<div class="response-content">' + (result.error || 'Unknown error') + '</div>';
                 }
             } catch (error) {
@@ -409,8 +223,9 @@ func handleHome(w http.ResponseWriter, r *http.Request) {
             
             // Reset button
             button.disabled = false;
-            button.textContent = '🧪 Test ' + button.textContent.split('Test ')[1].split('...')[0];
+            button.textContent = '🧪 Test ' + method + '()';
         }
+        
     </script>
 </body>
 </html>
@@ -449,76 +264,85 @@ func handleTestEndpoint(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Parse request body
-	var request struct {
-		Text string `json:"text"`
-	}
-	if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
-		http.Error(w, "Invalid JSON", http.StatusBadRequest)
+	// Parse request body as raw JSON
+	var inputJSON json.RawMessage
+	if err := json.NewDecoder(r.Body).Decode(&inputJSON); err != nil {
+		writeErrorResponse(w, "Invalid JSON: "+err.Error(), endpoint.Method)
 		return
 	}
 
-	// Prepare input JSON
-	inputJSON, err := json.Marshal(map[string]string{"text": request.Text})
-	if err != nil {
-		writeErrorResponse(w, "Failed to marshal input", endpoint.Model, endpoint.Path)
-		return
-	}
+	log.Printf("Testing CLI-generated method: %s", endpoint.Method)
 
-	// Execute using dual-path system
-	log.Printf("Testing %s with model %s (structured: %v)", endpoint.Name, endpoint.Model, endpoint.IsStructured)
+	// Call the appropriate CLI-generated method
+	var result interface{}
+	var err error
 
-	// Temporarily override goal's prompt to use specific model for this test
-	goal, exists := manager.Goals.Get(endpoint.GoalUID)
-	if !exists {
-		writeErrorResponse(w, "Goal not found", endpoint.Model, endpoint.Path)
-		return
-	}
-
-	// Find the prompt for this specific model
-	var promptUID string
-	for _, pUID := range goal.PromptUIDs {
-		if prompt, exists := manager.Prompts.Get(pUID); exists && prompt.Model == endpoint.Model {
-			promptUID = pUID
-			break
+	switch endpoint.Path {
+	case "text-summary":
+		var input mango.SummaryInput
+		if err := json.Unmarshal(inputJSON, &input); err != nil {
+			writeErrorResponse(w, "Invalid input for TextSummary: "+err.Error(), endpoint.Method)
+			return
 		}
-	}
+		result, err = mangoClient.TextSummary(&input)
 
-	if promptUID == "" {
-		writeErrorResponse(w, "No prompt found for model", endpoint.Model, endpoint.Path)
+	case "sentiment-analysis":
+		var input mango.SentimentInput
+		if err := json.Unmarshal(inputJSON, &input); err != nil {
+			writeErrorResponse(w, "Invalid input for SentimentAnalysis: "+err.Error(), endpoint.Method)
+			return
+		}
+		result, err = mangoClient.SentimentAnalysis(&input)
+
+	case "email-classification":
+		var input mango.EmailInput
+		if err := json.Unmarshal(inputJSON, &input); err != nil {
+			writeErrorResponse(w, "Invalid input for EmailClassification: "+err.Error(), endpoint.Method)
+			return
+		}
+		result, err = mangoClient.EmailClassification(&input)
+
+	case "language-detection":
+		var input mango.LanguageInput
+		if err := json.Unmarshal(inputJSON, &input); err != nil {
+			writeErrorResponse(w, "Invalid input for LanguageDetection: "+err.Error(), endpoint.Method)
+			return
+		}
+		result, err = mangoClient.LanguageDetection(&input)
+
+	default:
+		writeErrorResponse(w, "Unknown endpoint", endpoint.Method)
 		return
 	}
 
-	// Temporarily set goal to use only this prompt
-	originalPromptUIDs := goal.PromptUIDs
-	goal.PromptUIDs = []string{promptUID}
-	defer func() { goal.PromptUIDs = originalPromptUIDs }()
-
-	// Execute with dual-path system
-	result, err := manager.ExecuteGoalWithDualPath(endpoint.GoalUID, inputJSON)
 	if err != nil {
-		writeErrorResponse(w, err.Error(), endpoint.Model, endpoint.Path)
+		writeErrorResponse(w, err.Error(), endpoint.Method)
+		return
+	}
+
+	// Marshal result to JSON
+	resultJSON, err := json.MarshalIndent(result, "", "  ")
+	if err != nil {
+		writeErrorResponse(w, "Failed to marshal result: "+err.Error(), endpoint.Method)
 		return
 	}
 
 	// Write success response
 	response := TestResponse{
 		Success:  true,
-		Response: string(result),
-		Model:    endpoint.Model,
-		Path:     endpoint.Path,
+		Response: string(resultJSON),
+		Method:   endpoint.Method,
 	}
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(response)
 }
 
-func writeErrorResponse(w http.ResponseWriter, errorMsg, model, path string) {
+func writeErrorResponse(w http.ResponseWriter, errorMsg, method string) {
 	response := TestResponse{
 		Success: false,
 		Error:   errorMsg,
-		Model:   model,
-		Path:    path,
+		Method:  method,
 	}
 
 	w.Header().Set("Content-Type", "application/json")

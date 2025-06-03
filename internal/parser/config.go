@@ -76,7 +76,7 @@ func parseConfigFile(filename string, result *ParseResult) error {
 			VarName:     generateVarName(configGoal.UID, "Goal"),
 		}
 
-		// Convert input example to JSON string
+		// Convert input example to JSON string and validate
 		if configGoal.InputExample != nil {
 			inputJSON, err := json.Marshal(configGoal.InputExample)
 			if err != nil {
@@ -87,13 +87,28 @@ func parseConfigFile(filename string, result *ParseResult) error {
 				})
 				continue
 			}
+			
+			// Validate that the example has at least one field
+			if !hasAtLeastOneField(inputJSON) {
+				result.Errors = append(result.Errors, ParseError{
+					File:    filename,
+					Message: fmt.Sprintf("Goal '%s' input_example is empty '{}' - structured output requires at least one field (e.g., input_example: {\"text\": \"example\"})", goal.UID),
+					Type:    "error",
+				})
+				continue
+			}
+			
 			goal.InputExampleJSON = string(inputJSON)
 		} else {
-			// Provide default empty object
-			goal.InputExampleJSON = "{}"
+			result.Errors = append(result.Errors, ParseError{
+				File:    filename,
+				Message: fmt.Sprintf("Goal '%s' missing required input_example field - add 'input_example: {\"field\": \"value\"}' to your goal definition", goal.UID),
+				Type:    "error",
+			})
+			continue
 		}
 
-		// Convert output example to JSON string
+		// Convert output example to JSON string and validate
 		if configGoal.OutputExample != nil {
 			outputJSON, err := json.Marshal(configGoal.OutputExample)
 			if err != nil {
@@ -104,10 +119,25 @@ func parseConfigFile(filename string, result *ParseResult) error {
 				})
 				continue
 			}
+			
+			// Validate that the example has at least one field
+			if !hasAtLeastOneField(outputJSON) {
+				result.Errors = append(result.Errors, ParseError{
+					File:    filename,
+					Message: fmt.Sprintf("Goal '%s' output_example is empty '{}' - structured output requires at least one field (e.g., output_example: {\"result\": \"example\"})", goal.UID),
+					Type:    "error",
+				})
+				continue
+			}
+			
 			goal.OutputExampleJSON = string(outputJSON)
 		} else {
-			// Provide default empty object
-			goal.OutputExampleJSON = "{}"
+			result.Errors = append(result.Errors, ParseError{
+				File:    filename,
+				Message: fmt.Sprintf("Goal '%s' missing required output_example field - add 'output_example: {\"field\": \"value\"}' to your goal definition", goal.UID),
+				Type:    "error",
+			})
+			continue
 		}
 
 		// Validate required fields
@@ -287,4 +317,13 @@ func MergeResults(goResult, configResult *ParseResult) *ParseResult {
 	}
 
 	return merged
+}
+
+// hasAtLeastOneField checks if a JSON object has at least one field
+func hasAtLeastOneField(jsonData []byte) bool {
+	var obj map[string]interface{}
+	if err := json.Unmarshal(jsonData, &obj); err != nil {
+		return false // Invalid JSON
+	}
+	return len(obj) > 0
 }

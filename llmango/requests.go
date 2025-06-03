@@ -35,7 +35,6 @@ func RunRaw[I, R any](l *LLMangoManager, g *Goal, input *I) (*R, *openrouter.Non
 
 	for _, promptUID := range g.PromptUIDs {
 		if !l.Prompts.Exists(promptUID) {
-			log.Printf("WARN: prompt %s not found in manager, skipping.", promptUID)
 			continue
 		}
 		prompt, ok := l.Prompts.Get(promptUID)
@@ -111,18 +110,61 @@ func RunRaw[I, R any](l *LLMangoManager, g *Goal, input *I) (*R, *openrouter.Non
 		Parameters: selectedPrompt.Parameters,
 	}
 
-	// Generate response format from output example
-	var outputExample R
-	if err := json.Unmarshal(g.OutputExample, &outputExample); err != nil {
-		return nil, nil, fmt.Errorf("failed to unmarshal output example for goal '%s': %w", g.UID, err)
-	}
+	// Check if model supports structured output to determine execution path
+	supportsStructuredOutput := openrouter.SupportsStructuredOutput(selectedPrompt.Model)
 	
-	responseFormat, err := openrouter.UseOpenRouterJsonFormat(outputExample, g.Title)
-	if err != nil {
-		return nil, nil, fmt.Errorf("failed to create JSON schema format: %w", err)
-	}
+	if supportsStructuredOutput {
+		// Generate response format from output example for structured output
+		var outputExample R
+		if err := json.Unmarshal(g.OutputExample, &outputExample); err != nil {
+			return nil, nil, fmt.Errorf("failed to unmarshal output example for goal '%s': %w", g.UID, err)
+		}
+		
+		responseFormat, err := openrouter.UseOpenRouterJsonFormat(outputExample, g.Title)
+		if err != nil {
+			return nil, nil, fmt.Errorf("failed to create JSON schema format: %w", err)
+		}
 
-	routerRequest.Parameters.ResponseFormat = responseFormat
+		routerRequest.Parameters.ResponseFormat = responseFormat
+	} else {
+		// For models that don't support structured output, use universal prompts
+		// Generate schema for validation from output example
+		schema, err := openrouter.GenerateSchemaFromJSONExample(g.OutputExample)
+		if err != nil {
+			return nil, nil, fmt.Errorf("failed to generate schema for universal path: %w", err)
+		}
+
+		// Convert schema to map for universal prompt generation
+		schemaMap := make(map[string]interface{})
+		schemaBytes, err := json.Marshal(schema)
+		if err != nil {
+			return nil, nil, fmt.Errorf("failed to marshal schema: %w", err)
+		}
+		if err := json.Unmarshal(schemaBytes, &schemaMap); err != nil {
+			return nil, nil, fmt.Errorf("failed to unmarshal schema to map: %w", err)
+		}
+
+		// Extract existing system prompt from messages
+		existingSystemPrompt := ""
+		for _, msg := range updatedMessages {
+			if msg.Role == "system" && msg.Content != "" {
+				existingSystemPrompt = msg.Content
+				break
+			}
+		}
+
+		// Create universal system prompt
+		universalPrompt := openrouter.CreateUniversalCompatibilityPrompt(
+			existingSystemPrompt,
+			schemaMap,
+			g.InputExample,
+			g.OutputExample,
+		)
+
+		// Update messages with universal system prompt
+		updatedMessages = injectUniversalPromptIntoMessages(updatedMessages, universalPrompt)
+		routerRequest.Messages = updatedMessages
+	}
 
 	openrouterResponse, err := l.OpenRouter.GenerateNonStreamingChatResponse(routerRequest)
 
@@ -153,7 +195,7 @@ func RunRaw[I, R any](l *LLMangoManager, g *Goal, input *I) (*R, *openrouter.Non
 
 	if logErr != nil {
 		if l.Logging != nil && l.Logging.LogResponse != nil {
-			logEntry, createLogErr := l.createLogObject(g.UID, selectedPrompt.UID, input, routerRequest, openrouterResponse, nil, requestTimeElapsed, selectedPrompt.IsCanary, logErr)
+			logEntry, createLogErr := l.createLogObject(g.UID, selectedPrompt.UID, input, routerRequest, openrouterResponse, nil, requestTimeElapsed, true, logErr)
 			if createLogErr != nil {
 				log.Printf("Failed to create log object after API error: %v (Original Error: %v)", createLogErr, logErr)
 			} else {
@@ -170,7 +212,7 @@ func RunRaw[I, R any](l *LLMangoManager, g *Goal, input *I) (*R, *openrouter.Non
 	if openrouterResponse == nil {
 		logErr = errors.New("received nil response from OpenRouter without error")
 		if l.Logging != nil && l.Logging.LogResponse != nil {
-			logEntry, createLogErr := l.createLogObject(g.UID, selectedPrompt.UID, input, routerRequest, nil, nil, requestTimeElapsed, selectedPrompt.IsCanary, logErr)
+			logEntry, createLogErr := l.createLogObject(g.UID, selectedPrompt.UID, input, routerRequest, nil, nil, requestTimeElapsed, true, logErr)
 			if createLogErr == nil {
 				go func(mangoLog *LLMangoLog) {
 					if logErr := l.Logging.LogResponse(mangoLog); logErr != nil {
@@ -187,7 +229,7 @@ func RunRaw[I, R any](l *LLMangoManager, g *Goal, input *I) (*R, *openrouter.Non
 	if len(openrouterResponse.Choices) == 0 || openrouterResponse.Choices[0].Message.Content == nil {
 		logErr = errors.New("llm response had 0 choices or nil content")
 		if l.Logging != nil && l.Logging.LogResponse != nil {
-			logEntry, createLogErr := l.createLogObject(g.UID, selectedPrompt.UID, input, routerRequest, openrouterResponse, nil, requestTimeElapsed, selectedPrompt.IsCanary, logErr)
+			logEntry, createLogErr := l.createLogObject(g.UID, selectedPrompt.UID, input, routerRequest, openrouterResponse, nil, requestTimeElapsed, true, logErr)
 			if createLogErr == nil {
 				go func(mangoLog *LLMangoLog) {
 					if logErr := l.Logging.LogResponse(mangoLog); logErr != nil {
@@ -203,13 +245,40 @@ func RunRaw[I, R any](l *LLMangoManager, g *Goal, input *I) (*R, *openrouter.Non
 
 	content := *openrouterResponse.Choices[0].Message.Content
 	
+	// Handle response differently based on whether structured output was used
+	var finalContent string
+	if !supportsStructuredOutput {
+		// For universal compatibility path, clean the JSON response
+		cleanedJSON := openrouter.PseudoStructuredResponseCleaner(content)
+		if cleanedJSON == "" {
+			logErr = fmt.Errorf("failed to extract valid JSON from universal compatibility response: %s", content)
+			if l.Logging != nil && l.Logging.LogResponse != nil {
+				logEntry, createLogErr := l.createLogObject(g.UID, selectedPrompt.UID, input, routerRequest, openrouterResponse, nil, requestTimeElapsed, true, logErr)
+				if createLogErr == nil {
+					go func(mangoLog *LLMangoLog) {
+						if logErr := l.Logging.LogResponse(mangoLog); logErr != nil {
+							log.Printf("Failed to log JSON extraction error response: %v", logErr)
+						}
+					}(logEntry)
+				} else {
+					log.Printf("Failed to create log object for JSON extraction error: %v", createLogErr)
+				}
+			}
+			return nil, nil, logErr
+		}
+		finalContent = cleanedJSON
+	} else {
+		// For structured output path, use content directly
+		finalContent = content
+	}
+	
 	// Validate output using the goal's validator
-	outputJSON := json.RawMessage(content)
+	outputJSON := json.RawMessage(finalContent)
 	if g.OutputValidator != nil {
 		if err := g.OutputValidator(outputJSON); err != nil {
 			logErr = fmt.Errorf("output validation failed for goal '%s': %w", g.UID, err)
 			if l.Logging != nil && l.Logging.LogResponse != nil {
-				logEntry, createLogErr := l.createLogObject(g.UID, selectedPrompt.UID, input, routerRequest, openrouterResponse, nil, requestTimeElapsed, selectedPrompt.IsCanary, logErr)
+				logEntry, createLogErr := l.createLogObject(g.UID, selectedPrompt.UID, input, routerRequest, openrouterResponse, nil, requestTimeElapsed, true, logErr)
 				if createLogErr == nil {
 					go func(mangoLog *LLMangoLog) {
 						if logErr := l.Logging.LogResponse(mangoLog); logErr != nil {
@@ -224,10 +293,10 @@ func RunRaw[I, R any](l *LLMangoManager, g *Goal, input *I) (*R, *openrouter.Non
 		}
 	}
 	
-	if errUnmarshal := json.Unmarshal([]byte(content), &res); errUnmarshal != nil {
-		logErr = fmt.Errorf("failed to decode response content into target struct: %w, content: %s", errUnmarshal, content)
+	if errUnmarshal := json.Unmarshal([]byte(finalContent), &res); errUnmarshal != nil {
+		logErr = fmt.Errorf("failed to decode response content into target struct: %w, content: %s", errUnmarshal, finalContent)
 		if l.Logging != nil && l.Logging.LogResponse != nil {
-			logEntry, createLogErr := l.createLogObject(g.UID, selectedPrompt.UID, input, routerRequest, openrouterResponse, nil, requestTimeElapsed, selectedPrompt.IsCanary, logErr)
+			logEntry, createLogErr := l.createLogObject(g.UID, selectedPrompt.UID, input, routerRequest, openrouterResponse, nil, requestTimeElapsed, true, logErr)
 			if createLogErr == nil {
 				go func(mangoLog *LLMangoLog) {
 					if logErr := l.Logging.LogResponse(mangoLog); logErr != nil {
@@ -242,7 +311,7 @@ func RunRaw[I, R any](l *LLMangoManager, g *Goal, input *I) (*R, *openrouter.Non
 	}
 
 	if l.Logging != nil && l.Logging.LogResponse != nil {
-		logEntry, createLogErr := l.createLogObject(g.UID, selectedPrompt.UID, input, routerRequest, openrouterResponse, &res, requestTimeElapsed, selectedPrompt.IsCanary, nil) // Pass nil for error
+		logEntry, createLogErr := l.createLogObject(g.UID, selectedPrompt.UID, input, routerRequest, openrouterResponse, &res, requestTimeElapsed, true, nil) // Pass nil for error
 		if createLogErr != nil {
 			log.Printf("Failed to create log object for successful response: %v", createLogErr)
 		} else {
@@ -255,4 +324,41 @@ func RunRaw[I, R any](l *LLMangoManager, g *Goal, input *I) (*R, *openrouter.Non
 	}
 
 	return &res, openrouterResponse, nil
+}
+
+// injectUniversalPromptIntoMessages merges the universal system prompt with existing messages
+// Uses the collision strategy from universal_prompts.go
+func injectUniversalPromptIntoMessages(messages []openrouter.Message, universalPrompt string) []openrouter.Message {
+	var result []openrouter.Message
+	systemPromptInjected := false
+
+	for _, msg := range messages {
+		if msg.Role == "system" && !systemPromptInjected {
+			// Merge with existing system prompt using collision strategy
+			existingContent := ""
+			if msg.Content != "" {
+				existingContent = msg.Content
+			}
+
+			mergedContent := openrouter.MergeSystemPrompts(existingContent, universalPrompt)
+			result = append(result, openrouter.Message{
+				Role:    "system",
+				Content: mergedContent,
+			})
+			systemPromptInjected = true
+		} else {
+			result = append(result, msg)
+		}
+	}
+
+	// If no system message was found, add the universal prompt as the first message
+	if !systemPromptInjected {
+		systemMsg := openrouter.Message{
+			Role:    "system",
+			Content: universalPrompt,
+		}
+		result = append([]openrouter.Message{systemMsg}, result...)
+	}
+
+	return result
 }

@@ -18,6 +18,7 @@ import (
 
 type Mango struct {
 	*llmango.LLMangoManager
+	Debug bool
 }
 
 func CreateMango(or *openrouter.OpenRouter) (*Mango, error) {
@@ -40,13 +41,62 @@ func CreateMango(or *openrouter.OpenRouter) (*Mango, error) {
 {{- end}}
 	)
 
-	return &Mango{llmangoManager}, nil
+	return &Mango{
+		LLMangoManager: llmangoManager,
+		Debug:          false, // Can be enabled by calling SetDebug(true)
+	}, nil
+}
+
+// SetDebug enables or disables debug logging for requests and responses
+func (m *Mango) SetDebug(enabled bool) {
+	m.Debug = enabled
+}
+
+// debugLog logs debug information if debug mode is enabled
+func (m *Mango) debugLog(format string, args ...interface{}) {
+	if m.Debug {
+		log.Printf("[MANGO DEBUG] "+format, args...)
+	}
 }
 
 {{range .Goals}}
 // {{.MethodName}} executes the {{.Title}} goal
 func (m *Mango) {{.MethodName}}(input *{{.InputType}}) (*{{.OutputType}}, error) {
-	return llmango.Run[{{.InputType}}, {{.OutputType}}](m.LLMangoManager, &{{.VarName}}, input)
+	if m.Debug {
+		m.debugLog("=== {{.MethodName}} Request ===")
+		inputJSON, _ := json.MarshalIndent(input, "", "  ")
+		m.debugLog("Input: %s", string(inputJSON))
+		
+		// Log goal schema information
+		m.debugLog("Goal: %s (%s)", "{{.UID}}", "{{.Title}}")
+		m.debugLog("Input Schema: %s", string({{.VarName}}.InputExample))
+		m.debugLog("Output Schema: %s", string({{.VarName}}.OutputExample))
+	}
+	
+	result, rawResponse, err := llmango.RunRaw[{{.InputType}}, {{.OutputType}}](m.LLMangoManager, &{{.VarName}}, input)
+	
+	if m.Debug {
+		if err != nil {
+			m.debugLog("Error: %v", err)
+		} else {
+			// Log the raw response details
+			m.debugLog("Model Used: %s", rawResponse.Model)
+			m.debugLog("Usage - Prompt Tokens: %d, Completion Tokens: %d, Total: %d",
+				rawResponse.Usage.PromptTokens, rawResponse.Usage.CompletionTokens, rawResponse.Usage.TotalTokens)
+			
+			// Log the response
+			resultJSON, _ := json.MarshalIndent(result, "", "  ")
+			m.debugLog("Response: %s", string(resultJSON))
+			
+			// Log raw response if available
+			if len(rawResponse.Choices) > 0 {
+				m.debugLog("Raw Response Content: %s", rawResponse.Choices[0].Message.Content)
+			}
+		}
+		m.debugLog("=== {{.MethodName}} Complete ===")
+	}
+	
+	return result, err
 }
 
 // {{.MethodName}}Raw executes the {{.Title}} goal and returns the raw OpenRouter response
