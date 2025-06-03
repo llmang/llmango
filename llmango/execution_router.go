@@ -34,26 +34,24 @@ func (m *LLMangoManager) ExecuteGoalWithDualPath(goalUID string, input json.RawM
 	log.Printf("✅ Selected prompt '%s' for model '%s'", selectedPrompt.UID, selectedPrompt.Model)
 	log.Printf("📝 Prompt has %d messages", len(selectedPrompt.Messages))
 
-	// Get model capabilities to determine execution path
-	capabilities := openrouter.GetModelCapabilities(selectedPrompt.Model)
+	// Check if model supports structured output to determine execution path
+	supportsStructuredOutput := openrouter.SupportsStructuredOutput(selectedPrompt.Model)
 	
 	// Clear logging with emojis to show execution path
 	log.Println("=====================================")
-	if capabilities.SupportsStructuredOutput {
+	if supportsStructuredOutput {
 		log.Printf("🔧 STRUCTURED OUTPUT PATH SELECTED")
-		log.Printf("🔧 Model: %s | Provider: %s", selectedPrompt.Model, capabilities.Provider)
+		log.Printf("🔧 Model: %s", selectedPrompt.Model)
 		log.Printf("🔧 Using JSON Schema + response_format")
-		log.Printf("🔧 Notes: %s", capabilities.Notes)
 	} else {
 		log.Printf("🌍 UNIVERSAL PROMPT PATH SELECTED")
-		log.Printf("🌍 Model: %s | Provider: %s", selectedPrompt.Model, capabilities.Provider)
+		log.Printf("🌍 Model: %s", selectedPrompt.Model)
 		log.Printf("🌍 Using Universal Prompts for JSON")
-		log.Printf("🌍 Notes: %s", capabilities.Notes)
 	}
 	log.Println("=====================================")
 
 	// Choose execution path based on model capabilities
-	if capabilities.SupportsStructuredOutput {
+	if supportsStructuredOutput {
 		log.Printf("🔧 Executing STRUCTURED OUTPUT path for goal '%s'", goalUID)
 		return m.executeWithStructuredOutput(goal, selectedPrompt, input)
 	} else {

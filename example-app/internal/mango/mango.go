@@ -54,20 +54,6 @@ var languageDetectionGoal = llmango.Goal{
 	},
 }
 
-// languageDetectionOpenaiPrompt is generated from configuration
-var languageDetectionOpenaiPrompt = llmango.Prompt{
-	UID:     "language-detection-openai",
-	GoalUID: "language-detection",
-	Model:   "openai/gpt-3.5-turbo",
-	Weight:  100,
-	IsCanary: false,
-	MaxRuns: 0,
-	Messages: []openrouter.Message{
-		{Role: "system", Content: "You are a language detection expert. Identify the language of the given text and provide the language name and ISO code."},
-		{Role: "user", Content: "What language is this text: {{text}}"},
-	},
-}
-
 // languageDetectionLlamaPrompt is generated from configuration
 var languageDetectionLlamaPrompt = llmango.Prompt{
 	UID:     "language-detection-llama",
@@ -172,6 +158,20 @@ Body: {{body}}"},
 	},
 }
 
+// languageDetectionOpenaiPrompt is generated from configuration
+var languageDetectionOpenaiPrompt = llmango.Prompt{
+	UID:     "language-detection-openai",
+	GoalUID: "language-detection",
+	Model:   "openai/gpt-3.5-turbo",
+	Weight:  100,
+	IsCanary: false,
+	MaxRuns: 0,
+	Messages: []openrouter.Message{
+		{Role: "system", Content: "You are a language detection expert. Identify the language of the given text and provide the language name and ISO code."},
+		{Role: "user", Content: "What language is this text: {{text}}"},
+	},
+}
+
 type Mango struct {
 	*llmango.LLMangoManager
 }
@@ -192,7 +192,6 @@ func CreateMango(or *openrouter.OpenRouter) (*Mango, error) {
 
 	// Initialize prompts
 	llmangoManager.AddPrompts(
-		&languageDetectionOpenaiPrompt,
 		&languageDetectionLlamaPrompt,
 		&sentimentUniversalPrompt,
 		&summaryUniversalPrompt,
@@ -200,6 +199,7 @@ func CreateMango(or *openrouter.OpenRouter) (*Mango, error) {
 		&summaryStructuredPrompt,
 		&emailClassificationOpenaiPrompt,
 		&emailClassificationClaudePrompt,
+		&languageDetectionOpenaiPrompt,
 	)
 
 	return &Mango{llmangoManager}, nil

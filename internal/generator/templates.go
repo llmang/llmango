@@ -68,12 +68,12 @@ var {{.VarName}} = llmango.Goal{
 const configPromptTemplate = `
 // {{.VarName}} is generated from configuration
 var {{.VarName}} = llmango.Prompt{
-	UID:     "{{.UID}}",
-	GoalUID: "{{.GoalUID}}",
-	Model:   "{{.Model}}",
-	Weight:  {{.Weight}},
+	UID:      "{{.UID}}",
+	GoalUID:  "{{.GoalUID}}",
+	Model:    "{{.Model}}",
+	Weight:   {{.Weight}},
 	IsCanary: {{.IsCanary}},
-	MaxRuns: {{.MaxRuns}},
+	MaxRuns:  {{.MaxRuns}},
 	Messages: []openrouter.Message{
 {{- range .Messages}}
 		{Role: "{{.Role}}", Content: {{printf "%q" .Content}}},

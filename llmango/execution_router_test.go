@@ -21,7 +21,7 @@ func TestExecuteGoalWithDualPath(t *testing.T) {
 	manager.AddGoals(typedGoal, jsonGoal)
 
 	// Create test prompts
-	structuredPrompt := createTestPrompt("openai/gpt-4", "structured-prompt")
+	structuredPrompt := createTestPrompt("openai/gpt-4o", "structured-prompt")
 	universalPrompt := createTestPrompt("anthropic/claude-3-sonnet", "universal-prompt")
 
 	// Add prompts to manager
@@ -62,13 +62,13 @@ func TestExecuteGoalWithDualPath(t *testing.T) {
 			testhelpers.AssertTrue(t, exists, "Prompt should exist")
 
 			// Check model capabilities
-			capabilities := openrouter.GetModelCapabilities(prompt.Model)
-			testhelpers.AssertEqual(t, tt.expectedModelSupport, capabilities.SupportsStructuredOutput,
+			supportsStructuredOutput := openrouter.SupportsStructuredOutput(prompt.Model)
+			testhelpers.AssertEqual(t, tt.expectedModelSupport, supportsStructuredOutput,
 				"Model support should match expected for %s", prompt.Model)
 
 			// Note: We can't actually execute the goal without a real API key and network call
 			// But we can test the path selection logic
-			if capabilities.SupportsStructuredOutput {
+			if supportsStructuredOutput {
 				testhelpers.AssertEqual(t, "structured", tt.expectedPathType, "Should use structured path")
 			} else {
 				testhelpers.AssertEqual(t, "universal", tt.expectedPathType, "Should use universal path")
@@ -83,7 +83,7 @@ func TestSelectPromptForGoal(t *testing.T) {
 
 	// Create test goal and prompts
 	goal := createTestTypedGoal()
-	prompt1 := createTestPrompt("openai/gpt-4", "prompt-1")
+	prompt1 := createTestPrompt("openai/gpt-4o", "prompt-1")
 	prompt2 := createTestPrompt("anthropic/claude-3-sonnet", "prompt-2")
 
 	// Set up prompt weights
