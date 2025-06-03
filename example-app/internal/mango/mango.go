@@ -2,6 +2,7 @@
 package mango
 
 import (
+	"encoding/json"
 	"log"
 
 	"github.com/llmang/llmango/llmango"
@@ -15,10 +16,8 @@ var sentimentAnalysisGoal = llmango.Goal{
 	UID:         "sentiment-analysis",
 	Title:       "Sentiment Analysis",
 	Description: "Analyzes the sentiment of text input",
-	InputOutput: llmango.InputOutput[SentimentInput, SentimentOutput]{
-		InputExample:  SentimentInput{},
-		OutputExample: SentimentOutput{},
-	},
+	InputExample:  json.RawMessage(`{}`),
+	OutputExample: json.RawMessage(`{}`),
 }
 
 // textSummaryGoal is generated from configuration
@@ -26,10 +25,8 @@ var textSummaryGoal = llmango.Goal{
 	UID:         "text-summary",
 	Title:       "Text Summary",
 	Description: "Summarizes long text into key points",
-	InputOutput: llmango.InputOutput[SummaryInput, SummaryOutput]{
-		InputExample:  SummaryInput{},
-		OutputExample: SummaryOutput{},
-	},
+	InputExample:  json.RawMessage(`{}`),
+	OutputExample: json.RawMessage(`{}`),
 }
 
 // emailClassificationGoal is generated from configuration
@@ -37,10 +34,8 @@ var emailClassificationGoal = llmango.Goal{
 	UID:         "email-classification",
 	Title:       "Email Classification",
 	Description: "Classifies emails into categories like spam, important, promotional",
-	InputOutput: llmango.InputOutput[EmailInput, EmailOutput]{
-		InputExample:  EmailInput{},
-		OutputExample: EmailOutput{},
-	},
+	InputExample:  json.RawMessage(`{"body":"Don't miss out on our biggest sale of the year! Click here to shop now.","sender":"sales@example.com","subject":"Limited Time Offer - 50% Off Everything!"}`),
+	OutputExample: json.RawMessage(`{"category":"promotional","confidence":0.92,"reasoning":"Contains promotional language and discount offers"}`),
 }
 
 // languageDetectionGoal is generated from configuration
@@ -48,62 +43,18 @@ var languageDetectionGoal = llmango.Goal{
 	UID:         "language-detection",
 	Title:       "Language Detection",
 	Description: "Detects the language of input text",
-	InputOutput: llmango.InputOutput[LanguageInput, LanguageOutput]{
-		InputExample:  LanguageInput{},
-		OutputExample: LanguageOutput{},
-	},
-}
-
-// languageDetectionLlamaPrompt is generated from configuration
-var languageDetectionLlamaPrompt = llmango.Prompt{
-	UID:     "language-detection-llama",
-	GoalUID: "language-detection",
-	Model:   "meta-llama/llama-3.1-405b-instruct",
-	Weight:  100,
-	IsCanary: false,
-	MaxRuns: 0,
-	Messages: []openrouter.Message{
-		{Role: "system", Content: "You are a language detection expert. Identify the language of the given text and provide the language name and ISO code."},
-		{Role: "user", Content: "What language is this text: {{text}}"},
-	},
-}
-
-// sentimentUniversalPrompt is generated from configuration
-var sentimentUniversalPrompt = llmango.Prompt{
-	UID:     "sentiment-universal",
-	GoalUID: "sentiment-analysis",
-	Model:   "anthropic/claude-3-sonnet",
-	Weight:  100,
-	IsCanary: false,
-	MaxRuns: 0,
-	Messages: []openrouter.Message{
-		{Role: "system", Content: "You are a sentiment analysis expert. Analyze the sentiment of the given text and provide a confidence score."},
-		{Role: "user", Content: "Analyze the sentiment of this text: {{text}}"},
-	},
-}
-
-// summaryUniversalPrompt is generated from configuration
-var summaryUniversalPrompt = llmango.Prompt{
-	UID:     "summary-universal",
-	GoalUID: "text-summary",
-	Model:   "meta-llama/llama-3.1-405b-instruct",
-	Weight:  100,
-	IsCanary: false,
-	MaxRuns: 0,
-	Messages: []openrouter.Message{
-		{Role: "system", Content: "You are a text summarization expert. Create concise summaries with key points."},
-		{Role: "user", Content: "Summarize this text: {{text}}"},
-	},
+	InputExample:  json.RawMessage(`{"text":"Bonjour, comment allez-vous aujourd'hui?"}`),
+	OutputExample: json.RawMessage(`{"confidence":0.98,"language":"French","language_code":"fr"}`),
 }
 
 // sentimentStructuredPrompt is generated from configuration
 var sentimentStructuredPrompt = llmango.Prompt{
-	UID:     "sentiment-structured",
-	GoalUID: "sentiment-analysis",
-	Model:   "openai/gpt-4",
-	Weight:  100,
+	UID:      "sentiment-structured",
+	GoalUID:  "sentiment-analysis",
+	Model:    "openai/gpt-4",
+	Weight:   100,
 	IsCanary: false,
-	MaxRuns: 0,
+	MaxRuns:  0,
 	Messages: []openrouter.Message{
 		{Role: "system", Content: "You are a sentiment analysis expert. Analyze the sentiment of the given text and provide a confidence score."},
 		{Role: "user", Content: "Analyze the sentiment of this text: {{text}}"},
@@ -112,12 +63,12 @@ var sentimentStructuredPrompt = llmango.Prompt{
 
 // summaryStructuredPrompt is generated from configuration
 var summaryStructuredPrompt = llmango.Prompt{
-	UID:     "summary-structured",
-	GoalUID: "text-summary",
-	Model:   "openai/gpt-3.5-turbo",
-	Weight:  100,
+	UID:      "summary-structured",
+	GoalUID:  "text-summary",
+	Model:    "openai/gpt-3.5-turbo",
+	Weight:   100,
 	IsCanary: false,
-	MaxRuns: 0,
+	MaxRuns:  0,
 	Messages: []openrouter.Message{
 		{Role: "system", Content: "You are a text summarization expert. Create concise summaries with key points."},
 		{Role: "user", Content: "Summarize this text: {{text}}"},
@@ -126,49 +77,85 @@ var summaryStructuredPrompt = llmango.Prompt{
 
 // emailClassificationOpenaiPrompt is generated from configuration
 var emailClassificationOpenaiPrompt = llmango.Prompt{
-	UID:     "email-classification-openai",
-	GoalUID: "email-classification",
-	Model:   "openai/gpt-4",
-	Weight:  100,
+	UID:      "email-classification-openai",
+	GoalUID:  "email-classification",
+	Model:    "openai/gpt-4",
+	Weight:   100,
 	IsCanary: false,
-	MaxRuns: 0,
+	MaxRuns:  0,
 	Messages: []openrouter.Message{
 		{Role: "system", Content: "You are an email classification expert. Classify emails into categories: spam, important, promotional, personal, work."},
-		{Role: "user", Content: "Classify this email:
-Subject: {{subject}}
-From: {{sender}}
-Body: {{body}}"},
+		{Role: "user", Content: "Classify this email:\nSubject: {{subject}}\nFrom: {{sender}}\nBody: {{body}}"},
 	},
 }
 
 // emailClassificationClaudePrompt is generated from configuration
 var emailClassificationClaudePrompt = llmango.Prompt{
-	UID:     "email-classification-claude",
-	GoalUID: "email-classification",
-	Model:   "anthropic/claude-3-sonnet",
-	Weight:  100,
+	UID:      "email-classification-claude",
+	GoalUID:  "email-classification",
+	Model:    "anthropic/claude-3-sonnet",
+	Weight:   100,
 	IsCanary: false,
-	MaxRuns: 0,
+	MaxRuns:  0,
 	Messages: []openrouter.Message{
 		{Role: "system", Content: "You are an email classification expert. Classify emails into categories: spam, important, promotional, personal, work."},
-		{Role: "user", Content: "Classify this email:
-Subject: {{subject}}
-From: {{sender}}
-Body: {{body}}"},
+		{Role: "user", Content: "Classify this email:\nSubject: {{subject}}\nFrom: {{sender}}\nBody: {{body}}"},
 	},
 }
 
 // languageDetectionOpenaiPrompt is generated from configuration
 var languageDetectionOpenaiPrompt = llmango.Prompt{
-	UID:     "language-detection-openai",
-	GoalUID: "language-detection",
-	Model:   "openai/gpt-3.5-turbo",
-	Weight:  100,
+	UID:      "language-detection-openai",
+	GoalUID:  "language-detection",
+	Model:    "openai/gpt-3.5-turbo",
+	Weight:   100,
 	IsCanary: false,
-	MaxRuns: 0,
+	MaxRuns:  0,
 	Messages: []openrouter.Message{
 		{Role: "system", Content: "You are a language detection expert. Identify the language of the given text and provide the language name and ISO code."},
 		{Role: "user", Content: "What language is this text: {{text}}"},
+	},
+}
+
+// languageDetectionLlamaPrompt is generated from configuration
+var languageDetectionLlamaPrompt = llmango.Prompt{
+	UID:      "language-detection-llama",
+	GoalUID:  "language-detection",
+	Model:    "meta-llama/llama-3.1-405b-instruct",
+	Weight:   100,
+	IsCanary: false,
+	MaxRuns:  0,
+	Messages: []openrouter.Message{
+		{Role: "system", Content: "You are a language detection expert. Identify the language of the given text and provide the language name and ISO code."},
+		{Role: "user", Content: "What language is this text: {{text}}"},
+	},
+}
+
+// sentimentUniversalPrompt is generated from configuration
+var sentimentUniversalPrompt = llmango.Prompt{
+	UID:      "sentiment-universal",
+	GoalUID:  "sentiment-analysis",
+	Model:    "anthropic/claude-3-sonnet",
+	Weight:   100,
+	IsCanary: false,
+	MaxRuns:  0,
+	Messages: []openrouter.Message{
+		{Role: "system", Content: "You are a sentiment analysis expert. Analyze the sentiment of the given text and provide a confidence score."},
+		{Role: "user", Content: "Analyze the sentiment of this text: {{text}}"},
+	},
+}
+
+// summaryUniversalPrompt is generated from configuration
+var summaryUniversalPrompt = llmango.Prompt{
+	UID:      "summary-universal",
+	GoalUID:  "text-summary",
+	Model:    "meta-llama/llama-3.1-405b-instruct",
+	Weight:   100,
+	IsCanary: false,
+	MaxRuns:  0,
+	Messages: []openrouter.Message{
+		{Role: "system", Content: "You are a text summarization expert. Create concise summaries with key points."},
+		{Role: "user", Content: "Summarize this text: {{text}}"},
 	},
 }
 
@@ -192,14 +179,14 @@ func CreateMango(or *openrouter.OpenRouter) (*Mango, error) {
 
 	// Initialize prompts
 	llmangoManager.AddPrompts(
-		&languageDetectionLlamaPrompt,
-		&sentimentUniversalPrompt,
-		&summaryUniversalPrompt,
 		&sentimentStructuredPrompt,
 		&summaryStructuredPrompt,
 		&emailClassificationOpenaiPrompt,
 		&emailClassificationClaudePrompt,
 		&languageDetectionOpenaiPrompt,
+		&languageDetectionLlamaPrompt,
+		&sentimentUniversalPrompt,
+		&summaryUniversalPrompt,
 	)
 
 	return &Mango{llmangoManager}, nil

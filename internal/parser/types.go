@@ -4,14 +4,16 @@ import "github.com/llmang/llmango/openrouter"
 
 // DiscoveredGoal represents a goal found during parsing
 type DiscoveredGoal struct {
-	UID         string `json:"uid" yaml:"uid"`
-	Title       string `json:"title" yaml:"title"`
-	Description string `json:"description" yaml:"description"`
-	InputType   string `json:"input_type" yaml:"input_type"`
-	OutputType  string `json:"output_type" yaml:"output_type"`
-	SourceFile  string `json:"source_file" yaml:"source_file"`
-	SourceType  string `json:"source_type" yaml:"source_type"` // "go" or "config"
-	VarName     string `json:"var_name" yaml:"var_name"`       // Variable name in Go code
+	UID              string `json:"uid" yaml:"uid"`
+	Title            string `json:"title" yaml:"title"`
+	Description      string `json:"description" yaml:"description"`
+	InputType        string `json:"input_type" yaml:"input_type"`
+	OutputType       string `json:"output_type" yaml:"output_type"`
+	InputExampleJSON string `json:"input_example_json,omitempty" yaml:"input_example_json,omitempty"`
+	OutputExampleJSON string `json:"output_example_json,omitempty" yaml:"output_example_json,omitempty"`
+	SourceFile       string `json:"source_file" yaml:"source_file"`
+	SourceType       string `json:"source_type" yaml:"source_type"` // "go" or "config"
+	VarName          string `json:"var_name" yaml:"var_name"`       // Variable name in Go code
 }
 
 // DiscoveredPrompt represents a prompt found during parsing

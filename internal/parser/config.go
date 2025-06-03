@@ -76,6 +76,40 @@ func parseConfigFile(filename string, result *ParseResult) error {
 			VarName:     generateVarName(configGoal.UID, "Goal"),
 		}
 
+		// Convert input example to JSON string
+		if configGoal.InputExample != nil {
+			inputJSON, err := json.Marshal(configGoal.InputExample)
+			if err != nil {
+				result.Errors = append(result.Errors, ParseError{
+					File:    filename,
+					Message: fmt.Sprintf("Goal '%s' has invalid input_example: %v", goal.UID, err),
+					Type:    "error",
+				})
+				continue
+			}
+			goal.InputExampleJSON = string(inputJSON)
+		} else {
+			// Provide default empty object
+			goal.InputExampleJSON = "{}"
+		}
+
+		// Convert output example to JSON string
+		if configGoal.OutputExample != nil {
+			outputJSON, err := json.Marshal(configGoal.OutputExample)
+			if err != nil {
+				result.Errors = append(result.Errors, ParseError{
+					File:    filename,
+					Message: fmt.Sprintf("Goal '%s' has invalid output_example: %v", goal.UID, err),
+					Type:    "error",
+				})
+				continue
+			}
+			goal.OutputExampleJSON = string(outputJSON)
+		} else {
+			// Provide default empty object
+			goal.OutputExampleJSON = "{}"
+		}
+
 		// Validate required fields
 		if goal.UID == "" {
 			result.Errors = append(result.Errors, ParseError{

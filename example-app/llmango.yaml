@@ -18,12 +18,26 @@ goals:
     description: "Classifies emails into categories like spam, important, promotional"
     input_type: "EmailInput"
     output_type: "EmailOutput"
+    input_example:
+      subject: "Limited Time Offer - 50% Off Everything!"
+      body: "Don't miss out on our biggest sale of the year! Click here to shop now."
+      sender: "sales@example.com"
+    output_example:
+      category: "promotional"
+      confidence: 0.92
+      reasoning: "Contains promotional language and discount offers"
 
   - uid: "language-detection"
     title: "Language Detection"
     description: "Detects the language of input text"
     input_type: "LanguageInput"
     output_type: "LanguageOutput"
+    input_example:
+      text: "Bonjour, comment allez-vous aujourd'hui?"
+    output_example:
+      language: "French"
+      language_code: "fr"
+      confidence: 0.98
 
 prompts:
   # Structured Output Prompts (OpenAI models)
