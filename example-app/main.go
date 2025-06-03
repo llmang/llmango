@@ -14,12 +14,12 @@ import (
 )
 
 type TestEndpoint struct {
-	Name        string `json:"name"`
-	Path        string `json:"path"`
-	GoalUID     string `json:"goalUID"`
-	Model       string `json:"model"`
-	Description string `json:"description"`
-	IsStructured bool  `json:"isStructured"`
+	Name         string `json:"name"`
+	Path         string `json:"path"`
+	GoalUID      string `json:"goalUID"`
+	Model        string `json:"model"`
+	Description  string `json:"description"`
+	IsStructured bool   `json:"isStructured"`
 }
 
 type TestResponse struct {
@@ -72,7 +72,7 @@ func setupTestData() {
 	// 1. Create JSON Goals (Frontend/Dynamic style)
 	sentimentInputJSON := json.RawMessage(`{"text": "I love this new product!"}`)
 	sentimentOutputJSON := json.RawMessage(`{"sentiment": "positive", "confidence": 0.95, "reasoning": "Contains positive language"}`)
-	
+
 	jsonGoal := llmango.NewJSONGoal(
 		"sentiment-json",
 		"Sentiment Analysis (JSON)",
@@ -86,9 +86,9 @@ func setupTestData() {
 		Text string `json:"text"`
 	}
 	type SummaryOutput struct {
-		Summary    string `json:"summary"`
-		KeyPoints  []string `json:"key_points"`
-		WordCount  int    `json:"word_count"`
+		Summary   string   `json:"summary"`
+		KeyPoints []string `json:"key_points"`
+		WordCount int      `json:"word_count"`
 	}
 
 	typedGoal := llmango.NewGoal(
@@ -97,7 +97,7 @@ func setupTestData() {
 		"Summarizes text using typed goal",
 		SummaryInput{Text: "Long text to summarize..."},
 		SummaryOutput{
-			Summary: "Brief summary",
+			Summary:   "Brief summary",
 			KeyPoints: []string{"Point 1", "Point 2"},
 			WordCount: 150,
 		},
@@ -108,10 +108,10 @@ func setupTestData() {
 
 	// 3. Create Prompts for Structured Models (OpenAI GPT-4)
 	structuredSentimentPrompt := &llmango.Prompt{
-		UID:    "sentiment-structured",
+		UID:     "sentiment-structured",
 		GoalUID: "sentiment-json",
-		Model:  "openai/gpt-4",
-		Weight: 100,
+		Model:   "openai/gpt-4",
+		Weight:  100,
 		Messages: []openrouter.Message{
 			{Role: "system", Content: "You are a sentiment analysis expert. Analyze the sentiment of the given text."},
 			{Role: "user", Content: "Analyze the sentiment of this text: {{text}}"},
@@ -122,10 +122,10 @@ func setupTestData() {
 	}
 
 	structuredSummaryPrompt := &llmango.Prompt{
-		UID:    "summary-structured",
+		UID:     "summary-structured",
 		GoalUID: "summary-typed",
-		Model:  "openai/gpt-3.5-turbo",
-		Weight: 100,
+		Model:   "openai/gpt-3.5-turbo",
+		Weight:  100,
 		Messages: []openrouter.Message{
 			{Role: "system", Content: "You are a text summarization expert. Create concise summaries with key points."},
 			{Role: "user", Content: "Summarize this text: {{text}}"},
@@ -137,10 +137,10 @@ func setupTestData() {
 
 	// 4. Create Prompts for Universal Models (Anthropic Claude)
 	universalSentimentPrompt := &llmango.Prompt{
-		UID:    "sentiment-universal",
+		UID:     "sentiment-universal",
 		GoalUID: "sentiment-json",
-		Model:  "anthropic/claude-3-sonnet",
-		Weight: 100,
+		Model:   "anthropic/claude-3-sonnet",
+		Weight:  100,
 		Messages: []openrouter.Message{
 			{Role: "system", Content: "You are a sentiment analysis expert. Analyze the sentiment of the given text."},
 			{Role: "user", Content: "Analyze the sentiment of this text: {{text}}"},
@@ -151,10 +151,10 @@ func setupTestData() {
 	}
 
 	universalSummaryPrompt := &llmango.Prompt{
-		UID:    "summary-universal",
+		UID:     "summary-universal",
 		GoalUID: "summary-typed",
-		Model:  "meta-llama/llama-3.1-405b-instruct",
-		Weight: 100,
+		Model:   "meta-llama/llama-3.1-405b-instruct",
+		Weight:  100,
 		Messages: []openrouter.Message{
 			{Role: "system", Content: "You are a text summarization expert. Create concise summaries with key points."},
 			{Role: "user", Content: "Summarize this text: {{text}}"},
@@ -164,56 +164,135 @@ func setupTestData() {
 		},
 	}
 
+	// 5. Create Additional Prompts for More Model Testing
+	mistralSentimentPrompt := &llmango.Prompt{
+		UID:     "sentiment-mistral",
+		GoalUID: "sentiment-json",
+		Model:   "mistralai/mistral-large",
+		Weight:  100,
+		Messages: []openrouter.Message{
+			{Role: "system", Content: "You are a sentiment analysis expert. Analyze the sentiment of the given text."},
+			{Role: "user", Content: "Analyze the sentiment of this text: {{text}}"},
+		},
+		Parameters: openrouter.Parameters{
+			Temperature: &[]float64{0.3}[0],
+		},
+	}
+
+	cohereSummaryPrompt := &llmango.Prompt{
+		UID:     "summary-cohere",
+		GoalUID: "summary-typed",
+		Model:   "cohere/command-r",
+		Weight:  100,
+		Messages: []openrouter.Message{
+			{Role: "system", Content: "You are a text summarization expert. Create concise summaries with key points."},
+			{Role: "user", Content: "Summarize this text: {{text}}"},
+		},
+		Parameters: openrouter.Parameters{
+			Temperature: &[]float64{0.5}[0],
+		},
+	}
+
+	gpt4oMiniPrompt := &llmango.Prompt{
+		UID:     "sentiment-gpt4o-mini",
+		GoalUID: "sentiment-json",
+		Model:   "openai/gpt-4o-mini",
+		Weight:  100,
+		Messages: []openrouter.Message{
+			{Role: "system", Content: "You are a sentiment analysis expert. Analyze the sentiment of the given text."},
+			{Role: "user", Content: "Analyze the sentiment of this text: {{text}}"},
+		},
+		Parameters: openrouter.Parameters{
+			Temperature: &[]float64{0.3}[0],
+		},
+	}
+
 	// Add prompts to manager
 	manager.AddPrompts(
 		structuredSentimentPrompt,
 		structuredSummaryPrompt,
 		universalSentimentPrompt,
 		universalSummaryPrompt,
+		mistralSentimentPrompt,
+		cohereSummaryPrompt,
+		gpt4oMiniPrompt,
 	)
 
-	// 5. Setup test endpoints
+	// 6. Setup test endpoints
 	endpoints = []TestEndpoint{
 		{
-			Name:        "Sentiment (Structured - GPT-4)",
-			Path:        "sentiment-structured",
-			GoalUID:     "sentiment-json",
-			Model:       "openai/gpt-4",
-			Description: "JSON Goal + Structured Output Model",
+			Name:         "🔧 Sentiment (GPT-4)",
+			Path:         "sentiment-structured",
+			GoalUID:      "sentiment-json",
+			Model:        "openai/gpt-4",
+			Description:  "JSON Goal + Structured Output Model",
 			IsStructured: true,
 		},
 		{
-			Name:        "Sentiment (Universal - Claude)",
-			Path:        "sentiment-universal",
-			GoalUID:     "sentiment-json",
-			Model:       "anthropic/claude-3-sonnet",
-			Description: "JSON Goal + Universal Compatibility Model",
+			Name:         "🔧 Sentiment (GPT-4o Mini)",
+			Path:         "sentiment-gpt4o-mini",
+			GoalUID:      "sentiment-json",
+			Model:        "openai/gpt-4o-mini",
+			Description:  "JSON Goal + Structured Output Model (Fast)",
+			IsStructured: true,
+		},
+		{
+			Name:         "🌍 Sentiment (Claude)",
+			Path:         "sentiment-universal",
+			GoalUID:      "sentiment-json",
+			Model:        "anthropic/claude-3-sonnet",
+			Description:  "JSON Goal + Universal Compatibility Model",
 			IsStructured: false,
 		},
 		{
-			Name:        "Summary (Structured - GPT-3.5)",
-			Path:        "summary-structured",
-			GoalUID:     "summary-typed",
-			Model:       "openai/gpt-3.5-turbo",
-			Description: "Typed Goal + Structured Output Model",
+			Name:         "🌍 Sentiment (Mistral)",
+			Path:         "sentiment-mistral",
+			GoalUID:      "sentiment-json",
+			Model:        "mistralai/mistral-large",
+			Description:  "JSON Goal + Universal Compatibility Model",
+			IsStructured: false,
+		},
+		{
+			Name:         "🔧 Summary (GPT-3.5)",
+			Path:         "summary-structured",
+			GoalUID:      "summary-typed",
+			Model:        "openai/gpt-3.5-turbo",
+			Description:  "Typed Goal + Structured Output Model",
 			IsStructured: true,
 		},
 		{
-			Name:        "Summary (Universal - Llama)",
-			Path:        "summary-universal",
-			GoalUID:     "summary-typed",
-			Model:       "meta-llama/llama-3.1-405b-instruct",
-			Description: "Typed Goal + Universal Compatibility Model",
+			Name:         "🌍 Summary (Llama)",
+			Path:         "summary-universal",
+			GoalUID:      "summary-typed",
+			Model:        "meta-llama/llama-3.1-405b-instruct",
+			Description:  "Typed Goal + Universal Compatibility Model",
+			IsStructured: false,
+		},
+		{
+			Name:         "🌍 Summary (Cohere)",
+			Path:         "summary-cohere",
+			GoalUID:      "summary-typed",
+			Model:        "cohere/command-r",
+			Description:  "Typed Goal + Universal Compatibility Model",
 			IsStructured: false,
 		},
 	}
 
-	// Update goal prompt UIDs to use specific prompts for each test
+	// Update goal prompt UIDs to include all prompts for comprehensive testing
 	if goal, exists := manager.Goals.Get("sentiment-json"); exists {
-		goal.PromptUIDs = []string{"sentiment-structured", "sentiment-universal"}
+		goal.PromptUIDs = []string{
+			"sentiment-structured",
+			"sentiment-universal",
+			"sentiment-mistral",
+			"sentiment-gpt4o-mini",
+		}
 	}
 	if goal, exists := manager.Goals.Get("summary-typed"); exists {
-		goal.PromptUIDs = []string{"summary-structured", "summary-universal"}
+		goal.PromptUIDs = []string{
+			"summary-structured",
+			"summary-universal",
+			"summary-cohere",
+		}
 	}
 }
 
@@ -355,7 +434,7 @@ func handleTestEndpoint(w http.ResponseWriter, r *http.Request) {
 
 	// Extract endpoint path
 	path := r.URL.Path[len("/api/test/"):]
-	
+
 	// Find matching endpoint
 	var endpoint *TestEndpoint
 	for _, ep := range endpoints {
@@ -364,7 +443,7 @@ func handleTestEndpoint(w http.ResponseWriter, r *http.Request) {
 			break
 		}
 	}
-	
+
 	if endpoint == nil {
 		http.Error(w, "Endpoint not found", http.StatusNotFound)
 		return
@@ -388,7 +467,7 @@ func handleTestEndpoint(w http.ResponseWriter, r *http.Request) {
 
 	// Execute using dual-path system
 	log.Printf("Testing %s with model %s (structured: %v)", endpoint.Name, endpoint.Model, endpoint.IsStructured)
-	
+
 	// Temporarily override goal's prompt to use specific model for this test
 	goal, exists := manager.Goals.Get(endpoint.GoalUID)
 	if !exists {
@@ -404,7 +483,7 @@ func handleTestEndpoint(w http.ResponseWriter, r *http.Request) {
 			break
 		}
 	}
-	
+
 	if promptUID == "" {
 		writeErrorResponse(w, "No prompt found for model", endpoint.Model, endpoint.Path)
 		return

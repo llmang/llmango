@@ -12,6 +12,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"os"
 	"strings"
@@ -265,12 +266,32 @@ type PromptCompletionResponse struct {
 
 // --- Helper Function for NON-Streaming HTTP Request ---
 
+// autoConfigureProviderRequirements automatically sets ProviderRequireParameters
+// to true when ResponseFormat is detected (structured output)
+func (r *OpenRouterRequest) autoConfigureProviderRequirements() {
+	if r.Parameters.ResponseFormat != nil && len(r.Parameters.ResponseFormat) > 2 {
+		// Check if it's more than just "{}" - meaningful structured output
+		responseStr := string(r.Parameters.ResponseFormat)
+		if responseStr != "{}" && responseStr != "" {
+			if r.Parameters.ProviderRequireParameters == nil {
+				requireParams := true
+				r.Parameters.ProviderRequireParameters = &requireParams
+				log.Printf("🔧 Auto-detected structured output: setting require_parameters=true")
+			}
+		}
+	}
+}
+
 // executeOpenRouterRequest handles sending the request and basic response/error handling
 // for non-streaming requests. It returns the response body bytes on success.
 func (o *OpenRouter) executeOpenRouterRequest(request *OpenRouterRequest) ([]byte, error) {
 	if o.ApiKey == "" {
 		return nil, errors.New("API KEY is empty in openrouter instance")
 	}
+	
+	// Auto-configure provider requirements based on request content
+	request.autoConfigureProviderRequirements()
+	
 	// Ensure stream is not accidentally set for this helper
 	if request.Stream != nil && *request.Stream {
 		return nil, errors.New("executeOpenRouterRequest is for non-streaming requests; use GenerateStreamingChatResponse for streaming")
@@ -378,6 +399,9 @@ func (o *OpenRouter) GenerateStreamingChatResponse(ctx context.Context, request 
 		// Alternatively, return an error:
 		// return nil, errors.New("GenerateStreamingChatResponse requires the Stream field to be explicitly set to true")
 	}
+
+	// Auto-configure provider requirements based on request content
+	request.autoConfigureProviderRequirements()
 
 	// Marshal the request body to JSON
 	jsonData, err := json.Marshal(request)

@@ -37,15 +37,27 @@ func (m *LLMangoManager) ExecuteGoalWithDualPath(goalUID string, input json.RawM
 	// Get model capabilities to determine execution path
 	capabilities := openrouter.GetModelCapabilities(selectedPrompt.Model)
 	
-	log.Printf("🔍 Model capabilities for '%s': structured_output=%v",
-		selectedPrompt.Model, capabilities.SupportsStructuredOutput)
+	// Clear logging with emojis to show execution path
+	log.Println("=====================================")
+	if capabilities.SupportsStructuredOutput {
+		log.Printf("🔧 STRUCTURED OUTPUT PATH SELECTED")
+		log.Printf("🔧 Model: %s | Provider: %s", selectedPrompt.Model, capabilities.Provider)
+		log.Printf("🔧 Using JSON Schema + response_format")
+		log.Printf("🔧 Notes: %s", capabilities.Notes)
+	} else {
+		log.Printf("🌍 UNIVERSAL PROMPT PATH SELECTED")
+		log.Printf("🌍 Model: %s | Provider: %s", selectedPrompt.Model, capabilities.Provider)
+		log.Printf("🌍 Using Universal Prompts for JSON")
+		log.Printf("🌍 Notes: %s", capabilities.Notes)
+	}
+	log.Println("=====================================")
 
 	// Choose execution path based on model capabilities
 	if capabilities.SupportsStructuredOutput {
-		log.Printf("🎯 Using STRUCTURED OUTPUT path for goal '%s'", goalUID)
+		log.Printf("🔧 Executing STRUCTURED OUTPUT path for goal '%s'", goalUID)
 		return m.executeWithStructuredOutput(goal, selectedPrompt, input)
 	} else {
-		log.Printf("🌐 Using UNIVERSAL COMPATIBILITY path for goal '%s'", goalUID)
+		log.Printf("🌍 Executing UNIVERSAL COMPATIBILITY path for goal '%s'", goalUID)
 		return m.executeWithUniversalCompatibility(goal, selectedPrompt, input)
 	}
 }
@@ -53,7 +65,10 @@ func (m *LLMangoManager) ExecuteGoalWithDualPath(goalUID string, input json.RawM
 // executeWithStructuredOutput uses the existing structured output path
 // Enhanced with better error handling and fallback to universal path
 func (m *LLMangoManager) executeWithStructuredOutput(goal *Goal, prompt *Prompt, input json.RawMessage) (json.RawMessage, error) {
-	log.Printf("🎯 executeWithStructuredOutput: Starting for goal '%s'", goal.UID)
+	log.Println("=====================================")
+	log.Printf("🔧 STRUCTURED OUTPUT EXECUTION START")
+	log.Printf("🔧 Goal: %s | Model: %s", goal.UID, prompt.Model)
+	log.Println("=====================================")
 	
 	// Validate input using the goal's validator
 	if goal.InputValidator != nil {
@@ -99,20 +114,18 @@ func (m *LLMangoManager) executeWithStructuredOutput(goal *Goal, prompt *Prompt,
 		log.Printf("📤 Message %d [%s]: %s", i, msg.Role, msg.Content)
 	}
 
-	// Generate JSON schema for structured output
-	var outputExample interface{}
-	if err := json.Unmarshal(goal.OutputExample, &outputExample); err != nil {
-		// If we can't unmarshal the output example, fall back to universal path
-		log.Printf("❌ Failed to unmarshal output example for structured path, falling back to universal: %v", err)
+	// Generate JSON schema for structured output using our new JSON-optimized function
+	log.Printf("🔧 Generating JSON schema for structured output...")
+	log.Printf("🔧 goal.OutputExample: %s", string(goal.OutputExample))
+	
+	// Use the new UseOpenRouterJsonFormatFromJSON function designed for JSON data
+	responseFormat, err := openrouter.UseOpenRouterJsonFormatFromJSON(goal.OutputExample, goal.Title)
+	if err != nil {
+		log.Printf("❌ Failed to generate JSON response format, falling back to universal: %v", err)
 		return m.executeWithUniversalCompatibility(goal, prompt, input)
 	}
 	
-	responseFormat, err := openrouter.UseOpenRouterJsonFormat(outputExample, goal.Title)
-	if err != nil {
-		// If schema generation fails, fall back to universal path
-		log.Printf("❌ Failed to generate JSON schema for structured path, falling back to universal: %v", err)
-		return m.executeWithUniversalCompatibility(goal, prompt, input)
-	}
+	log.Printf("✅ Generated OpenRouter response format successfully")
 
 	routerRequest.Parameters.ResponseFormat = responseFormat
 	log.Printf("📤 Response format schema: %+v", responseFormat)
@@ -148,7 +161,10 @@ func (m *LLMangoManager) executeWithStructuredOutput(goal *Goal, prompt *Prompt,
 
 // executeWithUniversalCompatibility uses universal prompts for models that don't support structured output
 func (m *LLMangoManager) executeWithUniversalCompatibility(goal *Goal, prompt *Prompt, input json.RawMessage) (json.RawMessage, error) {
-	log.Printf("Using universal compatibility path for goal '%s'", goal.UID)
+	log.Println("=====================================")
+	log.Printf("🌍 UNIVERSAL COMPATIBILITY EXECUTION START")
+	log.Printf("🌍 Goal: %s | Model: %s", goal.UID, prompt.Model)
+	log.Println("=====================================")
 	
 	// Validate input using the goal's validator
 	if goal.InputValidator != nil {

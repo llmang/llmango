@@ -15,134 +15,164 @@ type ModelCapabilities struct {
 
 // StructuredOutputModels is a whitelist of models and their capabilities
 // This determines which execution path (structured vs universal) to use
+// Simplified list with key models for testing dual-path execution
 var StructuredOutputModels = map[string]ModelCapabilities{
+	// === STRUCTURED OUTPUT MODELS (🔧 Structured Path) ===
 	// OpenAI Models - Support structured output via response_format
 	"openai/gpt-4": {
 		SupportsStructuredOutput: true,
 		SupportsSystemPrompts:    true,
 		MaxContextLength:        128000,
 		Provider:                "openai",
-		Notes:                   "Full JSON schema support",
-	},
-	"openai/gpt-4-turbo": {
-		SupportsStructuredOutput: true,
-		SupportsSystemPrompts:    true,
-		MaxContextLength:        128000,
-		Provider:                "openai",
-		Notes:                   "Full JSON schema support",
+		Notes:                   "🔧 Structured Path - Full JSON schema support",
 	},
 	"openai/gpt-4o": {
 		SupportsStructuredOutput: true,
 		SupportsSystemPrompts:    true,
 		MaxContextLength:        128000,
 		Provider:                "openai",
-		Notes:                   "Full JSON schema support",
+		Notes:                   "🔧 Structured Path - Full JSON schema support",
 	},
 	"openai/gpt-4o-mini": {
 		SupportsStructuredOutput: true,
 		SupportsSystemPrompts:    true,
 		MaxContextLength:        128000,
 		Provider:                "openai",
-		Notes:                   "Full JSON schema support",
+		Notes:                   "🔧 Structured Path - Full JSON schema support",
 	},
 	"openai/gpt-3.5-turbo": {
 		SupportsStructuredOutput: true,
 		SupportsSystemPrompts:    true,
 		MaxContextLength:        16385,
 		Provider:                "openai",
-		Notes:                   "Full JSON schema support",
+		Notes:                   "🔧 Structured Path - Full JSON schema support",
 	},
-	"openai/gpt-3.5-turbo-16k": {
+	"openai/gpt-4-turbo": {
 		SupportsStructuredOutput: true,
 		SupportsSystemPrompts:    true,
-		MaxContextLength:        16385,
+		MaxContextLength:        128000,
 		Provider:                "openai",
-		Notes:                   "Full JSON schema support",
+		Notes:                   "🔧 Structured Path - Full JSON schema support",
 	},
 
+	// === UNIVERSAL PROMPT MODELS (🌍 Universal Path) ===
 	// Anthropic Models - Do not support structured output, use universal path
 	"anthropic/claude-3-opus": {
 		SupportsStructuredOutput: false,
 		SupportsSystemPrompts:    true,
 		MaxContextLength:        200000,
 		Provider:                "anthropic",
-		Notes:                   "Use universal prompts for JSON output",
+		Notes:                   "🌍 Universal Path - Use universal prompts for JSON output",
 	},
 	"anthropic/claude-3-sonnet": {
 		SupportsStructuredOutput: false,
 		SupportsSystemPrompts:    true,
 		MaxContextLength:        200000,
 		Provider:                "anthropic",
-		Notes:                   "Use universal prompts for JSON output",
-	},
-	"anthropic/claude-3-haiku": {
-		SupportsStructuredOutput: false,
-		SupportsSystemPrompts:    true,
-		MaxContextLength:        200000,
-		Provider:                "anthropic",
-		Notes:                   "Use universal prompts for JSON output",
+		Notes:                   "🌍 Universal Path - Use universal prompts for JSON output",
 	},
 	"anthropic/claude-3.5-sonnet": {
 		SupportsStructuredOutput: false,
 		SupportsSystemPrompts:    true,
 		MaxContextLength:        200000,
 		Provider:                "anthropic",
-		Notes:                   "Use universal prompts for JSON output",
-	},
-
-	// Google Models - Limited structured output support
-	"google/gemini-pro": {
-		SupportsStructuredOutput: false,
-		SupportsSystemPrompts:    true,
-		MaxContextLength:        32768,
-		Provider:                "google",
-		Notes:                   "Use universal prompts for JSON output",
-	},
-	"google/gemini-pro-vision": {
-		SupportsStructuredOutput: false,
-		SupportsSystemPrompts:    true,
-		MaxContextLength:        32768,
-		Provider:                "google",
-		Notes:                   "Use universal prompts for JSON output",
+		Notes:                   "🌍 Universal Path - Use universal prompts for JSON output",
 	},
 
 	// Meta Llama Models - Do not support structured output
-	"meta-llama/llama-2-70b-chat": {
-		SupportsStructuredOutput: false,
-		SupportsSystemPrompts:    true,
-		MaxContextLength:        4096,
-		Provider:                "meta",
-		Notes:                   "Use universal prompts for JSON output",
-	},
-	"meta-llama/llama-3-70b-instruct": {
-		SupportsStructuredOutput: false,
-		SupportsSystemPrompts:    true,
-		MaxContextLength:        8192,
-		Provider:                "meta",
-		Notes:                   "Use universal prompts for JSON output",
-	},
 	"meta-llama/llama-3.1-405b-instruct": {
 		SupportsStructuredOutput: false,
 		SupportsSystemPrompts:    true,
 		MaxContextLength:        131072,
 		Provider:                "meta",
-		Notes:                   "Use universal prompts for JSON output",
+		Notes:                   "🌍 Universal Path - Use universal prompts for JSON output",
+	},
+	"meta-llama/llama-3.1-70b-instruct": {
+		SupportsStructuredOutput: false,
+		SupportsSystemPrompts:    true,
+		MaxContextLength:        131072,
+		Provider:                "meta",
+		Notes:                   "🌍 Universal Path - Use universal prompts for JSON output",
+	},
+	"meta-llama/llama-3.3-70b-instruct": {
+		SupportsStructuredOutput: false,
+		SupportsSystemPrompts:    true,
+		MaxContextLength:        32768,
+		Provider:                "meta",
+		Notes:                   "🌍 Universal Path - Use universal prompts for JSON output",
 	},
 
-	// Mistral Models - Limited structured output support
-	"mistralai/mistral-7b-instruct": {
+	// Google Models
+	"google/gemini-1.5-flash": {
 		SupportsStructuredOutput: false,
 		SupportsSystemPrompts:    true,
-		MaxContextLength:        32768,
-		Provider:                "mistral",
-		Notes:                   "Use universal prompts for JSON output",
+		MaxContextLength:        1048576,
+		Provider:                "google",
+		Notes:                   "🌍 Universal Path - Use universal prompts for JSON output",
 	},
-	"mistralai/mixtral-8x7b-instruct": {
+	"google/gemini-1.5-pro": {
 		SupportsStructuredOutput: false,
 		SupportsSystemPrompts:    true,
-		MaxContextLength:        32768,
+		MaxContextLength:        2097152,
+		Provider:                "google",
+		Notes:                   "🌍 Universal Path - Use universal prompts for JSON output",
+	},
+
+	// Mistral Models
+	"mistralai/mistral-large": {
+		SupportsStructuredOutput: false,
+		SupportsSystemPrompts:    true,
+		MaxContextLength:        131072,
 		Provider:                "mistral",
-		Notes:                   "Use universal prompts for JSON output",
+		Notes:                   "🌍 Universal Path - Use universal prompts for JSON output",
+	},
+	"mistralai/mistral-small": {
+		SupportsStructuredOutput: false,
+		SupportsSystemPrompts:    true,
+		MaxContextLength:        131072,
+		Provider:                "mistral",
+		Notes:                   "🌍 Universal Path - Use universal prompts for JSON output",
+	},
+
+	// Cohere Models
+	"cohere/command-r": {
+		SupportsStructuredOutput: false,
+		SupportsSystemPrompts:    true,
+		MaxContextLength:        131072,
+		Provider:                "cohere",
+		Notes:                   "🌍 Universal Path - Use universal prompts for JSON output",
+	},
+	"cohere/command-r-plus": {
+		SupportsStructuredOutput: false,
+		SupportsSystemPrompts:    true,
+		MaxContextLength:        131072,
+		Provider:                "cohere",
+		Notes:                   "🌍 Universal Path - Use universal prompts for JSON output",
+	},
+
+	// DeepSeek Models
+	"deepseek/deepseek-chat": {
+		SupportsStructuredOutput: false,
+		SupportsSystemPrompts:    true,
+		MaxContextLength:        65536,
+		Provider:                "deepseek",
+		Notes:                   "🌍 Universal Path - Use universal prompts for JSON output",
+	},
+	"deepseek/deepseek-r1": {
+		SupportsStructuredOutput: false,
+		SupportsSystemPrompts:    true,
+		MaxContextLength:        131072,
+		Provider:                "deepseek",
+		Notes:                   "🌍 Universal Path - Use universal prompts for JSON output",
+	},
+
+	// Qwen Models
+	"qwen/qwen-2.5-72b-instruct": {
+		SupportsStructuredOutput: false,
+		SupportsSystemPrompts:    true,
+		MaxContextLength:        131072,
+		Provider:                "alibaba",
+		Notes:                   "🌍 Universal Path - Use universal prompts for JSON output",
 	},
 
 	// Default fallback for unknown models
@@ -151,7 +181,7 @@ var StructuredOutputModels = map[string]ModelCapabilities{
 		SupportsSystemPrompts:    true,
 		MaxContextLength:        4096,
 		Provider:                "unknown",
-		Notes:                   "Default fallback - use universal prompts",
+		Notes:                   "🌍 Universal Path - Default fallback",
 	},
 }
 
@@ -178,7 +208,7 @@ func GetModelCapabilities(modelID string) ModelCapabilities {
 				SupportsSystemPrompts:    true,
 				MaxContextLength:        128000,
 				Provider:                "openai",
-				Notes:                   "Pattern matched OpenAI model",
+				Notes:                   "🔧 Structured Path - Pattern matched OpenAI model",
 			}
 		}
 	}
@@ -190,7 +220,7 @@ func GetModelCapabilities(modelID string) ModelCapabilities {
 			SupportsSystemPrompts:    true,
 			MaxContextLength:        200000,
 			Provider:                "anthropic",
-			Notes:                   "Pattern matched Anthropic model",
+			Notes:                   "🌍 Universal Path - Pattern matched Anthropic model",
 		}
 	}
 
@@ -201,7 +231,7 @@ func GetModelCapabilities(modelID string) ModelCapabilities {
 			SupportsSystemPrompts:    true,
 			MaxContextLength:        8192,
 			Provider:                "meta",
-			Notes:                   "Pattern matched Llama model",
+			Notes:                   "🌍 Universal Path - Pattern matched Llama model",
 		}
 	}
 
@@ -212,7 +242,7 @@ func GetModelCapabilities(modelID string) ModelCapabilities {
 			SupportsSystemPrompts:    true,
 			MaxContextLength:        32768,
 			Provider:                "google",
-			Notes:                   "Pattern matched Google model",
+			Notes:                   "🌍 Universal Path - Pattern matched Google model",
 		}
 	}
 
