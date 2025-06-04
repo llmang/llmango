@@ -1,5 +1,6 @@
 package llmangoagents
 
+import "encoding/json"
 
 type Tool struct {
 	ToolUid      string
@@ -10,7 +11,6 @@ type Tool struct {
 
 type ToolConstructor func(*WorkflowManager) *Tool
 
-
 // Cloud function tool
 //allow suers to have arbritrary endpoints for tools
 //input json output json.
@@ -18,8 +18,6 @@ type ToolConstructor func(*WorkflowManager) *Tool
 
 //searchtool
 //bing or google
-
-import "encoding/json"
 
 type searchTool struct{}
 

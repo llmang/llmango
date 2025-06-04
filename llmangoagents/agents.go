@@ -62,9 +62,9 @@ func (ws *WorkflowStep) ValidateWorkflowstep() {
 	//make sure there is at least 1 agent
 }
 
-type AgentSystemManager{
+type AgentSystemManager struct{
 	CompatabillityCutoff int //unix timestamp for last point of compatability (point where users can/cannot pick back up a conversation)
-	ActiveWorkflows map[string]{timestamp int, *WorkflowManager}
+	ActiveWorkflows map[string]struct{timestamp int, *WorkflowManager}
 }
 
 func(asm *AgentSystemManager)RebuildWorkflowManager(string)(

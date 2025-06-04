@@ -17,11 +17,13 @@ func Run[I, R any](l *LLMangoManager, g *Goal, input *I) (*R, error) {
 }
 func RunRaw[I, R any](l *LLMangoManager, g *Goal, input *I) (*R, *openrouter.NonStreamingChatResponse, error) {
 	// Validate input using the goal's validator
+	fmt.Println("THIS IS API KEY?")
+	fmt.Println(l.OpenRouter.ApiKey[:10])
 	inputJSON, err := json.Marshal(input)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to marshal input for goal '%s': %w", g.UID, err)
 	}
-	
+
 	if g.InputValidator != nil {
 		if err := g.InputValidator(inputJSON); err != nil {
 			return nil, nil, fmt.Errorf("input validation failed for goal '%s': %w", g.UID, err)
@@ -112,14 +114,14 @@ func RunRaw[I, R any](l *LLMangoManager, g *Goal, input *I) (*R, *openrouter.Non
 
 	// Check if model supports structured output to determine execution path
 	supportsStructuredOutput := openrouter.SupportsStructuredOutput(selectedPrompt.Model)
-	
+
 	if supportsStructuredOutput {
 		// Generate response format from output example for structured output
 		var outputExample R
 		if err := json.Unmarshal(g.OutputExample, &outputExample); err != nil {
 			return nil, nil, fmt.Errorf("failed to unmarshal output example for goal '%s': %w", g.UID, err)
 		}
-		
+
 		responseFormat, err := openrouter.UseOpenRouterJsonFormat(outputExample, g.Title)
 		if err != nil {
 			return nil, nil, fmt.Errorf("failed to create JSON schema format: %w", err)
@@ -244,7 +246,7 @@ func RunRaw[I, R any](l *LLMangoManager, g *Goal, input *I) (*R, *openrouter.Non
 	}
 
 	content := *openrouterResponse.Choices[0].Message.Content
-	
+
 	// Handle response differently based on whether structured output was used
 	var finalContent string
 	if !supportsStructuredOutput {
@@ -271,7 +273,7 @@ func RunRaw[I, R any](l *LLMangoManager, g *Goal, input *I) (*R, *openrouter.Non
 		// For structured output path, use content directly
 		finalContent = content
 	}
-	
+
 	// Validate output using the goal's validator
 	outputJSON := json.RawMessage(finalContent)
 	if g.OutputValidator != nil {
@@ -292,7 +294,7 @@ func RunRaw[I, R any](l *LLMangoManager, g *Goal, input *I) (*R, *openrouter.Non
 			return nil, nil, logErr
 		}
 	}
-	
+
 	if errUnmarshal := json.Unmarshal([]byte(finalContent), &res); errUnmarshal != nil {
 		logErr = fmt.Errorf("failed to decode response content into target struct: %w, content: %s", errUnmarshal, finalContent)
 		if l.Logging != nil && l.Logging.LogResponse != nil {
