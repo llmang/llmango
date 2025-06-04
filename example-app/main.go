@@ -43,6 +43,7 @@ func main() {
 	if apiKey == "" {
 		log.Fatal("OPENROUTER_API_KEY environment variable is required")
 	}
+	fmt.Println(apiKey[:10])
 
 	// Initialize OpenRouter
 	openRouter, err := openrouter.CreateOpenRouter(apiKey)
