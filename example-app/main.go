@@ -35,7 +35,7 @@ var endpoints []TestEndpoint
 
 func main() {
 	// Load environment variables
-	if err := godotenv.Load(); err != nil {
+	if err := godotenv.Overload(".env"); err != nil {
 		log.Printf("Warning: .env file not found: %v", err)
 	}
 
@@ -43,8 +43,6 @@ func main() {
 	if apiKey == "" {
 		log.Fatal("OPENROUTER_API_KEY environment variable is required")
 	}
-	fmt.Println(apiKey[:10])
-
 	// Initialize OpenRouter
 	openRouter, err := openrouter.CreateOpenRouter(apiKey)
 	if err != nil {
@@ -69,7 +67,7 @@ func main() {
 	http.HandleFunc("/api/test/", handleTestEndpoint)
 
 	fmt.Println("🚀 LLMango CLI-Generated Test Server starting on http://localhost:8080")
-	fmt.Println("📝 Make sure to set OPENROUTER_API_KEY in your .env file")
+	fmt.Println("📝 Make sure to set OPENROUTER_API_KEY in your .env file in the same dir as the example-app")
 	fmt.Println("🔧 Testing CLI-generated goals and methods")
 	log.Fatal(http.ListenAndServe(":8080", nil))
 }

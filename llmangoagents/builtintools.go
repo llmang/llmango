@@ -2,14 +2,15 @@ package llmangoagents
 
 import "encoding/json"
 
-type Tool struct {
-	ToolUid      string
-	Function     func(json.RawMessage) (json.RawMessage, error)
-	InputSchema  string
-	OutputSchema string
-}
 
 type ToolConstructor func(*WorkflowManager) *Tool
+
+//Agent specific tools
+//Thinking - ability to pause and think
+//
+//When subAgents
+//    -- Transmit Back partial data
+//    -- Optional Handoff to other agent
 
 // Cloud function tool
 //allow suers to have arbritrary endpoints for tools

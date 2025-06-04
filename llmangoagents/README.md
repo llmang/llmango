@@ -96,10 +96,10 @@ Automatic tool schema generation for LLM integration:
 ## Workflow Execution Flow
 
 1. **Step Initialization**: Lead agent receives task and context
-2. **Planning Phase**: Lead agent decides on approach using available tools/agents
+2. **Planning Phase**(OPTIONAL): Lead agent decides on approach using available tools/agents
 3. **Execution Phase**: 
    - Use tools directly, OR
-   - Delegate to assistant agents with potential handoffs
+   - Delegate to assistant agents (agents can have or not have handoff abilities)
    - Assistant agents can collaborate before returning to lead agent
 4. **Step Completion**: Lead agent consolidates results and passes to next step
 5. **Workflow Completion**: Final step returns results to user

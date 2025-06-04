@@ -17,8 +17,6 @@ func Run[I, R any](l *LLMangoManager, g *Goal, input *I) (*R, error) {
 }
 func RunRaw[I, R any](l *LLMangoManager, g *Goal, input *I) (*R, *openrouter.NonStreamingChatResponse, error) {
 	// Validate input using the goal's validator
-	fmt.Println("THIS IS API KEY?")
-	fmt.Println(l.OpenRouter.ApiKey[:10])
 	inputJSON, err := json.Marshal(input)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to marshal input for goal '%s': %w", g.UID, err)
