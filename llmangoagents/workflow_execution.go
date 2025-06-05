@@ -11,7 +11,7 @@ import (
 // Execute runs the workflow with the given input
 func (ctx *WorkflowExecutionContext) Execute(input string) (string, error) {
 	currentInput := input
-	
+
 	// Set the original user input for context inheritance
 	setWorkflowContext(ctx, input)
 
@@ -46,21 +46,21 @@ func (ctx *WorkflowExecutionContext) Execute(input string) (string, error) {
 			// Create list of all agents in this step (lead agent + subAgents)
 			allStepAgents := []string{step.Agent}
 			allStepAgents = append(allStepAgents, step.SubAgents...)
-			
+
 			// Generate handoff tools for each agent in the step
 			for _, agentUID := range allStepAgents {
 				handoffTool := NewHandoffTool(allStepAgents, agentUID, ctx.SystemManager)
 				if handoffTool != nil {
 					// Add the handoff tool to the system manager temporarily for this step
 					ctx.SystemManager.Tools = append(ctx.SystemManager.Tools, handoffTool)
-					
+
 					// Add handoffTool to the agent's tools list
 					agent, err := ctx.SystemManager.GetAgent(agentUID)
 					if err == nil {
 						// Create a copy of the agent with the handoff tool added
 						agentCopy := *agent
 						agentCopy.Tools = append(agentCopy.Tools, "handoffTool")
-						
+
 						// Update the agent in the system manager
 						for j, existingAgent := range ctx.SystemManager.Agents {
 							if existingAgent.UID == agentUID {
@@ -95,7 +95,7 @@ func (stepCtx *StepExecutionContext) Execute(input string) (string, error) {
 	// Start with the lead agent
 	currentAgentUID := stepCtx.LeadAgentUID
 	currentInput := input
-	
+
 	// Execute agents in the step, handling handoffs
 	for {
 		// Get current agent from system manager
@@ -128,7 +128,7 @@ func (stepCtx *StepExecutionContext) Execute(input string) (string, error) {
 					// Create list of all agents in this step (lead agent + subAgents)
 					allStepAgents := []string{step.Agent}
 					allStepAgents = append(allStepAgents, step.SubAgents...)
-					
+
 					// Check if this agent needs a handoff tool and doesn't have one
 					needsHandoffTool := false
 					for _, agentUID := range allStepAgents {
@@ -137,7 +137,7 @@ func (stepCtx *StepExecutionContext) Execute(input string) (string, error) {
 							break
 						}
 					}
-					
+
 					if needsHandoffTool {
 						// Check if handoff tool already exists for this agent
 						handoffToolExists := false
@@ -147,18 +147,18 @@ func (stepCtx *StepExecutionContext) Execute(input string) (string, error) {
 								break
 							}
 						}
-						
+
 						if !handoffToolExists {
 							// Generate handoff tool for this agent
 							handoffTool := NewHandoffTool(allStepAgents, currentAgentUID, stepCtx.ParentWorkflowContext.SystemManager)
 							if handoffTool != nil {
 								// Add the handoff tool to the system manager
 								stepCtx.ParentWorkflowContext.SystemManager.Tools = append(stepCtx.ParentWorkflowContext.SystemManager.Tools, handoffTool)
-								
+
 								// Add handoffTool to the agent's tools list
 								agentCopy := *currentAgent
 								agentCopy.Tools = append(agentCopy.Tools, "handoffTool")
-								
+
 								// Update the agent in the system manager
 								for j, existingAgent := range stepCtx.ParentWorkflowContext.SystemManager.Agents {
 									if existingAgent.UID == currentAgentUID {
@@ -188,7 +188,7 @@ func (stepCtx *StepExecutionContext) Execute(input string) (string, error) {
 			// Record the handoff in history
 			handoffRecord := fmt.Sprintf("%s -> %s", currentAgentUID, handoffTarget)
 			stepCtx.HandoffHistory = append(stepCtx.HandoffHistory, handoffRecord)
-			
+
 			// Continue with the handoff target agent
 			currentAgentUID = handoffTarget
 			currentInput = result // Pass the result as input to the next agent
@@ -207,7 +207,7 @@ func parseHandoffKey(result string) string {
 	var handoffResult struct {
 		HandoffKey string `json:"handoffKey"`
 	}
-	
+
 	if err := json.Unmarshal([]byte(result), &handoffResult); err == nil && handoffResult.HandoffKey != "" {
 		// Parse the handoff key: @@HANDOFF:target_agent:input:reason@@
 		handoffKey := handoffResult.HandoffKey
@@ -220,7 +220,7 @@ func parseHandoffKey(result string) string {
 			}
 		}
 	}
-	
+
 	// Fallback: look for handoff key pattern directly in the result
 	if strings.Contains(result, "@@HANDOFF:") {
 		start := strings.Index(result, "@@HANDOFF:")
@@ -237,6 +237,6 @@ func parseHandoffKey(result string) string {
 			}
 		}
 	}
-	
+
 	return ""
 }
