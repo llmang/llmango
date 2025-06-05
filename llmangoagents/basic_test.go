@@ -67,9 +67,6 @@ func TestGetTestConfig(t *testing.T) {
 		t.Errorf("Expected step agent 'test_agent', got '%s'", step.Agent)
 	}
 
-	if step.AllowHandoffs != false {
-		t.Errorf("Expected AllowHandoffs false, got %t", step.AllowHandoffs)
-	}
 }
 
 // TestGetTestConfigJSON verifies that the test configuration can be serialized to JSON

@@ -28,7 +28,7 @@ func TestMVPUsageExample(t *testing.T) {
 	}
 
 	t.Logf("Found workflow: %s with %d steps", workflow.Name, len(workflow.Steps))
-	t.Logf("Workflow limits - MaxTime: %ds, MaxSteps: %d, MaxSpend: %d", 
+	t.Logf("Workflow limits - MaxTime: %ds, MaxSteps: %d, MaxSpend: %d",
 		workflow.Options.MaxTime, workflow.Options.MaxSteps, workflow.Options.MaxSpend)
 
 	// Step 4: Verify the workflow step references the correct agent
@@ -43,7 +43,7 @@ func TestMVPUsageExample(t *testing.T) {
 	// Step 5: Test the mock OpenRouter functionality
 	mock := NewMockOpenRouter()
 	mock.SetResponse("anthropic/claude-3-haiku", "Hello from the test agent!")
-	
+
 	// Verify the mock is configured correctly
 	if mock.ResponseMap["anthropic/claude-3-haiku"] != "Hello from the test agent!" {
 		t.Error("Mock response not set correctly")
@@ -61,7 +61,7 @@ func TestMVPConfigurationDetails(t *testing.T) {
 	config := GetTestConfig()
 
 	t.Log("=== MVP Test Configuration Details ===")
-	
+
 	// Agent details
 	t.Logf("Agent Count: %d", len(config.Agents))
 	for i, agent := range config.Agents {
@@ -86,13 +86,12 @@ func TestMVPConfigurationDetails(t *testing.T) {
 		t.Logf("  MaxSteps: %d", workflow.Options.MaxSteps)
 		t.Logf("  MaxSpend: %d", workflow.Options.MaxSpend)
 		t.Logf("  Steps Count: %d", len(workflow.Steps))
-		
+
 		for j, step := range workflow.Steps {
 			t.Logf("    Step %d:", j+1)
 			t.Logf("      UID: %s", step.UID)
 			t.Logf("      Agent: %s", step.Agent)
 			t.Logf("      SubAgents: %v", step.SubAgents)
-			t.Logf("      AllowHandoffs: %t", step.AllowHandoffs)
 			t.Logf("      ExitBehavior: %s", step.ExitBehavior)
 		}
 	}
