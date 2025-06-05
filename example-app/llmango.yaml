@@ -1,33 +1,7 @@
 # LLMango Dual-Path Test Configuration
+# NOTE: sentiment-analysis and text-summary goals are defined in Go code using NewGoal() (pointers)
+# The goals below are config-only goals (will be generated as values)
 goals:
-  - uid: "sentiment-analysis"
-    title: "Sentiment Analysis"
-    description: "Analyzes the sentiment of text input"
-    input_type: "SentimentInput"
-    output_type: "SentimentOutput"
-    input_example:
-      text: "I absolutely love this new AI system! It's incredibly helpful and makes my work so much easier."
-    output_example:
-      sentiment: "positive"
-      confidence: 0.95
-      reasoning: "Contains positive language like 'love', 'incredibly helpful', and 'easier'"
-    
-  - uid: "text-summary"
-    title: "Text Summary"
-    description: "Summarizes long text into key points"
-    input_type: "SummaryInput"
-    output_type: "SummaryOutput"
-    input_example:
-      text: "Artificial intelligence (AI) is transforming industries worldwide. From healthcare to finance, AI systems are automating complex tasks, improving efficiency, and enabling new capabilities. Machine learning algorithms can now process vast amounts of data to identify patterns and make predictions. However, the rapid advancement of AI also raises important questions about ethics, job displacement, and the need for proper regulation. As we move forward, it's crucial to balance innovation with responsible development to ensure AI benefits society as a whole."
-    output_example:
-      summary: "AI is transforming industries by automating tasks and improving efficiency, but raises important questions about ethics and regulation that need to be addressed."
-      key_points:
-        - "AI systems are automating complex tasks across industries"
-        - "Machine learning processes data to identify patterns and make predictions"
-        - "Rapid AI advancement raises ethics and job displacement concerns"
-        - "Need for proper regulation and responsible development"
-      word_count: 150
-
   # Config-based goals (these will be generated from config, not Go code)
   - uid: "email-classification"
     title: "Email Classification"
@@ -56,8 +30,8 @@ goals:
       confidence: 0.98
 
 prompts:
-  # Structured Output Prompts (OpenAI models)
-  - uid: "sentiment-structured"
+  # Prompts for Go-defined goals (pointer goals)
+  - uid: "sentiment-openai"
     goal_uid: "sentiment-analysis"
     model: "openai/gpt-4"
     weight: 100
@@ -67,15 +41,35 @@ prompts:
       - role: "user"
         content: "Analyze the sentiment of this text: {{text}}"
         
-  - uid: "summary-structured"
-    goal_uid: "text-summary"
-    model: "openai/gpt-3.5-turbo"
+  - uid: "code-review-claude"
+    goal_uid: "code-review"
+    model: "anthropic/claude-3-sonnet"
     weight: 100
     messages:
       - role: "system"
-        content: "You are a text summarization expert. Create concise summaries with key points."
+        content: "You are a code review expert. Analyze code and provide suggestions for improvement."
       - role: "user"
-        content: "Summarize this text: {{text}}"
+        content: "Review this {{language}} code: {{code}}"
+
+  - uid: "translation-openai"
+    goal_uid: "translation"
+    model: "openai/gpt-4"
+    weight: 100
+    messages:
+      - role: "system"
+        content: "You are a translation expert. Translate text accurately between languages."
+      - role: "user"
+        content: "Translate this text to {{target_lang}}: {{text}}"
+
+  - uid: "text-summary-openai"
+    goal_uid: "text-summary"
+    model: "openai/gpt-4"
+    weight: 100
+    messages:
+      - role: "system"
+        content: "You are a text summarization expert. Create concise summaries with key points and word counts."
+      - role: "user"
+        content: "Summarize this text and extract key points: {{text}}"
 
   # Prompts for config-based goals
   - uid: "email-classification-openai"

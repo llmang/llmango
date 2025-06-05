@@ -5,6 +5,7 @@ import (
 	"go/ast"
 	"go/parser"
 	"go/token"
+	"os"
 	"path/filepath"
 	"regexp"
 	"strings"
@@ -12,14 +13,44 @@ import (
 
 // ParseGoFiles scans Go files in the given directory and extracts goal and prompt definitions
 func ParseGoFiles(dir string) (*ParseResult, error) {
+	return ParseGoFilesWithExclusions(dir, nil)
+}
+
+// ParseGoFilesWithExclusions scans Go files in the given directory and extracts goal and prompt definitions,
+// excluding files that match the provided exclusion patterns
+func ParseGoFilesWithExclusions(dir string, excludeFiles []string) (*ParseResult, error) {
 	result := &ParseResult{
 		Goals:   []DiscoveredGoal{},
 		Prompts: []DiscoveredPrompt{},
 		Errors:  []ParseError{},
 	}
 
+	// Create a filter function that excludes specified files
+	filter := func(info os.FileInfo) bool {
+		// Skip non-Go files
+		if !strings.HasSuffix(info.Name(), ".go") {
+			return false
+		}
+		
+		// Skip excluded files
+		for _, exclude := range excludeFiles {
+			if matched, _ := filepath.Match(exclude, info.Name()); matched {
+				fmt.Printf("EXCLUDING file %s (matched pattern %s)\n", info.Name(), exclude)
+				return false
+			}
+			// Also check full path match
+			if info.Name() == filepath.Base(exclude) {
+				fmt.Printf("EXCLUDING file %s (exact match %s)\n", info.Name(), exclude)
+				return false
+			}
+		}
+		
+		fmt.Printf("INCLUDING file %s\n", info.Name())
+		return true
+	}
+
 	fset := token.NewFileSet()
-	pkgs, err := parser.ParseDir(fset, dir, nil, parser.ParseComments)
+	pkgs, err := parser.ParseDir(fset, dir, filter, parser.ParseComments)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse Go files: %w", err)
 	}
@@ -30,7 +61,6 @@ func ParseGoFiles(dir string) (*ParseResult, error) {
 			parseFile(fset, file, relPath, result)
 		}
 	}
-
 	return result, nil
 }
 
@@ -108,6 +138,7 @@ func parseNewGoalCall(fset *token.FileSet, callExpr *ast.CallExpr, varName, file
 		VarName:    varName,
 		SourceFile: filename,
 		SourceType: "go",
+		IsPointer:  true, // NewGoal() and NewJSONGoal() return *Goal
 	}
 
 	// NewGoal(uid, title, description, inputExample, outputExample, validator)
@@ -193,6 +224,7 @@ func parseGoalLiteral(fset *token.FileSet, lit *ast.CompositeLit, varName, filen
 		VarName:    varName,
 		SourceFile: filename,
 		SourceType: "go",
+		IsPointer:  false, // llmango.Goal{} composite literals are value types
 	}
 
 	for _, elt := range lit.Elts {

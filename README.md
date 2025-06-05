@@ -6,6 +6,11 @@ Hardcode Goals, Not Prompts
 
 Goal-driven LLM framework for Go with universal model compatibility. By [Carson](https://carsho.dev).
 
+
+## CLI TOOL install
+go get -tool github.com/llmang/llmango/cmd/llmango
+
+
 ## What It Does
 
 Organizes LLM queries into Goals and Prompts. Focus on outcomes, not prompts.
