@@ -59,7 +59,7 @@ type Tool struct {
 type Agent struct {
 	UID           string   `json:"uid"`
 	Name          string   `json:"name"`
-	Description   string   `json:"description"`   // Brief description for tool handoffs
+	Description   string   `json:"description"` // Brief description for tool handoffs
 	SystemMessage string   `json:"systemMessage"`
 	Model         string   `json:"model"`
 	Parameters    string   `json:"parameters"`

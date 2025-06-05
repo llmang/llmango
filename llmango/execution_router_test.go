@@ -32,21 +32,21 @@ func TestExecuteGoalWithDualPath(t *testing.T) {
 	jsonGoal.PromptUIDs = []string{universalPrompt.UID}
 
 	tests := []struct {
-		name                string
-		goalUID             string
-		expectedPathType    string
+		name                 string
+		goalUID              string
+		expectedPathType     string
 		expectedModelSupport bool
 	}{
 		{
-			name:                "Typed goal with structured output model",
-			goalUID:             typedGoal.UID,
-			expectedPathType:    "structured",
+			name:                 "Typed goal with structured output model",
+			goalUID:              typedGoal.UID,
+			expectedPathType:     "structured",
 			expectedModelSupport: true,
 		},
 		{
-			name:                "JSON goal with universal compatibility model",
-			goalUID:             jsonGoal.UID,
-			expectedPathType:    "universal",
+			name:                 "JSON goal with universal compatibility model",
+			goalUID:              jsonGoal.UID,
+			expectedPathType:     "universal",
 			expectedModelSupport: false,
 		},
 	}
@@ -137,11 +137,11 @@ func TestInjectUniversalPrompt(t *testing.T) {
 	universalPrompt := "You must respond with valid JSON matching the schema."
 
 	tests := []struct {
-		name            string
-		inputMessages   []openrouter.Message
-		expectedCount   int
-		expectedSystem  bool
-		description     string
+		name           string
+		inputMessages  []openrouter.Message
+		expectedCount  int
+		expectedSystem bool
+		description    string
 	}{
 		{
 			name: "Messages with existing system prompt",
@@ -164,8 +164,8 @@ func TestInjectUniversalPrompt(t *testing.T) {
 			description:    "Should add system prompt as first message",
 		},
 		{
-			name: "Empty messages",
-			inputMessages: []openrouter.Message{},
+			name:           "Empty messages",
+			inputMessages:  []openrouter.Message{},
 			expectedCount:  1,
 			expectedSystem: true,
 			description:    "Should add system prompt to empty messages",
@@ -175,14 +175,14 @@ func TestInjectUniversalPrompt(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			result := manager.injectUniversalPrompt(tt.inputMessages, universalPrompt)
-			
-			testhelpers.AssertEqual(t, tt.expectedCount, len(result), 
+
+			testhelpers.AssertEqual(t, tt.expectedCount, len(result),
 				"%s: Message count mismatch", tt.description)
 
 			if tt.expectedSystem {
-				testhelpers.AssertEqual(t, "system", result[0].Role, 
+				testhelpers.AssertEqual(t, "system", result[0].Role,
 					"%s: First message should be system", tt.description)
-				testhelpers.AssertContains(t, result[0].Content, "JSON", 
+				testhelpers.AssertContains(t, result[0].Content, "JSON",
 					"%s: System message should contain universal prompt", tt.description)
 			}
 		})
@@ -205,12 +205,12 @@ func TestInjectUniversalPromptMerging(t *testing.T) {
 
 	testhelpers.AssertEqual(t, 2, len(result), "Should have same number of messages")
 	testhelpers.AssertEqual(t, "system", result[0].Role, "First message should be system")
-	
+
 	// Check that both prompts are present in the merged content
 	mergedContent := result[0].Content
-	testhelpers.AssertContains(t, mergedContent, "helpful assistant", 
+	testhelpers.AssertContains(t, mergedContent, "helpful assistant",
 		"Should contain original system prompt")
-	testhelpers.AssertContains(t, mergedContent, "valid JSON", 
+	testhelpers.AssertContains(t, mergedContent, "valid JSON",
 		"Should contain universal prompt")
 }
 

@@ -57,19 +57,19 @@ func ExampleTypedGoal() *Goal {
 	inputExample := SentimentInput{
 		Text: "I love this new product! It works perfectly and exceeded my expectations.",
 	}
-	
+
 	outputExample := SentimentOutput{
 		Sentiment:  "positive",
 		Confidence: 0.92,
 		Reasoning:  "The text contains positive language like 'love', 'perfectly', and 'exceeded expectations'",
 	}
-	
+
 	// Create validator
 	validator := TypedValidator[SentimentInput, SentimentOutput]{
 		ValidateInput:  validateSentimentInput,
 		ValidateOutput: validateSentimentOutput,
 	}
-	
+
 	// Create goal using NewGoal (standard way for developers)
 	goal := NewGoal(
 		"sentiment-classifier",
@@ -79,7 +79,7 @@ func ExampleTypedGoal() *Goal {
 		outputExample,
 		validator,
 	)
-	
+
 	fmt.Printf("Created typed goal: %s (IsSchemaValidated: %v)\n", goal.UID, goal.IsSchemaValidated)
 	return goal
 }
@@ -91,7 +91,7 @@ func ExampleJSONGoal() *Goal {
 		"text": "John Smith works at Apple Inc. in Cupertino, California. He can be reached at john.smith@apple.com or (555) 123-4567.",
 		"entity_types": ["person", "organization", "location", "email", "phone"]
 	}`)
-	
+
 	outputJSON := json.RawMessage(`{
 		"entities": [
 			{
@@ -125,7 +125,7 @@ func ExampleJSONGoal() *Goal {
 		],
 		"total_entities": 4
 	}`)
-	
+
 	// Create goal using NewJSONGoal (standard way for frontend/dynamic use)
 	goal := NewJSONGoal(
 		"entity-extractor",
@@ -134,7 +134,7 @@ func ExampleJSONGoal() *Goal {
 		inputJSON,
 		outputJSON,
 	)
-	
+
 	fmt.Printf("Created JSON goal: %s (IsSchemaValidated: %v)\n", goal.UID, goal.IsSchemaValidated)
 	return goal
 }
@@ -144,10 +144,10 @@ func ExampleGoalUsage() {
 	// Create both types of goals
 	typedGoal := ExampleTypedGoal()
 	jsonGoal := ExampleJSONGoal()
-	
+
 	// Both goals have the same runtime interface
 	fmt.Println("\n=== Typed Goal Validation ===")
-	
+
 	// Test typed goal validation (sentiment analysis)
 	validInput := json.RawMessage(`{"text": "This movie was absolutely fantastic!"}`)
 	if err := typedGoal.InputValidator(validInput); err != nil {
@@ -155,14 +155,14 @@ func ExampleGoalUsage() {
 	} else {
 		fmt.Println("Input validation passed!")
 	}
-	
+
 	invalidInput := json.RawMessage(`{"text": ""}`)
 	if err := typedGoal.InputValidator(invalidInput); err != nil {
 		fmt.Printf("Expected validation failure: %v\n", err)
 	}
-	
+
 	fmt.Println("\n=== JSON Goal Validation ===")
-	
+
 	// Test JSON goal validation (entity extraction)
 	validEntityInput := json.RawMessage(`{"text": "Alice Johnson works at Microsoft.", "entity_types": ["person", "organization"]}`)
 	if err := jsonGoal.InputValidator(validEntityInput); err != nil {
@@ -170,40 +170,31 @@ func ExampleGoalUsage() {
 	} else {
 		fmt.Println("Input validation passed!")
 	}
-	
+
 	invalidEntityInput := json.RawMessage(`{"text": "Alice Johnson works at Microsoft."}`)
 	if err := jsonGoal.InputValidator(invalidEntityInput); err != nil {
 		fmt.Printf("Expected validation failure: %v\n", err)
 	}
-	
-	// Show goal conversion
-	fmt.Println("\n=== Goal Conversion ===")
-	convertedGoal, err := ConvertTypedGoalToJSON(typedGoal)
-	if err != nil {
-		fmt.Printf("Conversion failed: %v\n", err)
-	} else {
-		fmt.Printf("Converted typed goal to JSON goal (IsSchemaValidated: %v)\n", convertedGoal.IsSchemaValidated)
-	}
-	
+
 	// Show goal validation warnings
 	fmt.Println("\n=== Goal Validation Warnings ===")
-	
+
 	// Goal without validators
 	goalNoValidators := NewGoal("no-validators", "No Validators", "Goal without validators",
 		SentimentInput{Text: "This is a test"},
 		SentimentOutput{Sentiment: "neutral", Confidence: 0.5, Reasoning: "Test reasoning"})
-	
+
 	warnings := goalNoValidators.Validate()
 	if len(warnings) > 0 {
 		fmt.Printf("Warnings for goal without validators: %v\n", warnings)
 	}
-	
+
 	// Goal with validators
 	warnings = typedGoal.Validate()
 	if len(warnings) == 0 {
 		fmt.Println("No warnings for properly configured typed goal")
 	}
-	
+
 	warnings = jsonGoal.Validate()
 	if len(warnings) == 0 {
 		fmt.Println("No warnings for JSON goal")
@@ -218,36 +209,26 @@ func ExampleManagerIntegration() {
 		fmt.Printf("Failed to create manager: %v\n", err)
 		return
 	}
-	
+
 	// Create and add goals
 	typedGoal := ExampleTypedGoal()
 	jsonGoal := ExampleJSONGoal()
-	
+
 	manager.AddGoals(typedGoal, jsonGoal)
-	
+
 	fmt.Printf("\n=== Manager Integration ===\n")
 	fmt.Printf("Added %d goals to manager\n", len(manager.Goals.Snapshot()))
-	
+
 	// Retrieve goals
 	retrievedTyped, exists := manager.Goals.Get("sentiment-classifier")
 	if exists {
 		fmt.Printf("Retrieved typed goal: %s (IsSchemaValidated: %v)\n",
 			retrievedTyped.UID, retrievedTyped.IsSchemaValidated)
 	}
-	
+
 	retrievedJSON, exists := manager.Goals.Get("entity-extractor")
 	if exists {
 		fmt.Printf("Retrieved JSON goal: %s (IsSchemaValidated: %v)\n",
 			retrievedJSON.UID, retrievedJSON.IsSchemaValidated)
-	}
-	
-	// Demonstrate reconstruction (simulating startup)
-	fmt.Println("\n=== Goal Reconstruction ===")
-	for _, goal := range manager.Goals.Snapshot() {
-		if err := goal.ReconstructValidators(); err != nil {
-			fmt.Printf("Failed to reconstruct validators for %s: %v\n", goal.UID, err)
-		} else {
-			fmt.Printf("Successfully reconstructed validators for %s\n", goal.UID)
-		}
 	}
 }

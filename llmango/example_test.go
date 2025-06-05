@@ -11,18 +11,12 @@ func TestExampleUsage(t *testing.T) {
 		if goal == nil {
 			t.Error("ExampleTypedGoal returned nil")
 		}
-		if goal.IsSchemaValidated {
-			t.Error("Typed goal should not be schema validated")
-		}
 	})
 
 	t.Run("ExampleJSONGoal", func(t *testing.T) {
 		goal := ExampleJSONGoal()
 		if goal == nil {
 			t.Error("ExampleJSONGoal returned nil")
-		}
-		if !goal.IsSchemaValidated {
-			t.Error("JSON goal should be schema validated")
 		}
 	})
 

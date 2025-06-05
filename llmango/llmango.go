@@ -73,14 +73,6 @@ type Goal struct {
 	OutputValidator func(json.RawMessage) error `json:"-"`
 }
 
-// Legacy InputOutput struct for backwards compatibility during transition
-type InputOutput[input any, output any] struct {
-	InputExample    input             `json:"inputExample"`
-	InputValidator  func(input) bool  `json:"-"`
-	OutputExample   output            `json:"outputExample"`
-	OutputValidator func(output) bool `json:"-"`
-}
-
 // GoalValidator interface for typed goals
 type GoalValidator[I, O any] interface {
 	ValidateInput(input I) error
@@ -103,7 +95,6 @@ func (re *ResultError) Error() string {
 
 // AddOrUpdateGoals adds or updates goals in the LLMangoManager.
 // It updates the Title, Description, CreatedAt, and UpdatedAt fields of existing goals.
-// It does NOT overwrite the InputOutput field of existing goals.
 func (m *LLMangoManager) AddOrUpdateGoals(goals ...*Goal) {
 	now := int(time.Now().Unix())
 	for _, goal := range goals {
@@ -316,33 +307,5 @@ func (g *Goal) generateSchemaValidators() error {
 		}
 	}
 
-	return nil
-}
-
-// ConvertTypedGoalToJSON converts an existing typed goal to JSON format
-func ConvertTypedGoalToJSON(typedGoal *Goal) (*Goal, error) {
-	if typedGoal.IsSchemaValidated {
-		return typedGoal, nil // Already JSON format
-	}
-
-	// Create new JSON goal with same data
-	return NewJSONGoal(
-		typedGoal.UID,
-		typedGoal.Title,
-		typedGoal.Description,
-		typedGoal.InputExample,
-		typedGoal.OutputExample,
-	), nil
-}
-
-// ReconstructValidators reconstructs validators for a goal after deserialization
-func (g *Goal) ReconstructValidators() error {
-	if g.IsSchemaValidated {
-		// Generate schema validators from JSON examples
-		return g.generateSchemaValidators()
-	}
-	// For typed goals, validators would need to be reconstructed from stored metadata
-	// This is a placeholder - in practice, typed goals would need their validators
-	// to be re-registered after startup
 	return nil
 }
