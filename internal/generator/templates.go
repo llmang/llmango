@@ -59,14 +59,6 @@ func (m *Mango) {{.MethodName}}(input *{{.InputType}}) (*{{.OutputType}}, error)
 {{- end}}
 }
 
-// {{.MethodName}}Raw executes the {{.Title}} goal and returns the raw OpenRouter response
-func (m *Mango) {{.MethodName}}Raw(input *{{.InputType}}) (*{{.OutputType}}, *openrouter.NonStreamingChatResponse, error) {
-{{- if .IsPointer}}
-	return llmango.RunRaw[{{.InputType}}, {{.OutputType}}](m.LLMangoManager, {{.VarName}}, input)
-{{- else}}
-	return llmango.RunRaw[{{.InputType}}, {{.OutputType}}](m.LLMangoManager, &{{.VarName}}, input)
-{{- end}}
-}
 {{end}}`
 
 // configGoalTemplate is the template for generating goals from config

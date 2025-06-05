@@ -29,34 +29,6 @@ var languageDetectionGoal = llmango.Goal{
 	OutputExample: json.RawMessage(`{"confidence":0.98,"language":"French","language_code":"fr"}`),
 }
 
-// sentimentUniversalPrompt is generated from configuration
-var sentimentUniversalPrompt = llmango.Prompt{
-	UID:      "sentiment-universal",
-	GoalUID:  "sentiment-analysis",
-	Model:    "anthropic/claude-3-sonnet",
-	Weight:   100,
-	IsCanary: false,
-	MaxRuns:  0,
-	Messages: []openrouter.Message{
-		{Role: "system", Content: "You are a sentiment analysis expert. Analyze the sentiment of the given text and provide a confidence score."},
-		{Role: "user", Content: "Analyze the sentiment of this text: {{text}}"},
-	},
-}
-
-// codeReviewClaudePrompt is generated from configuration
-var codeReviewClaudePrompt = llmango.Prompt{
-	UID:      "code-review-claude",
-	GoalUID:  "code-review",
-	Model:    "anthropic/claude-3-sonnet",
-	Weight:   100,
-	IsCanary: false,
-	MaxRuns:  0,
-	Messages: []openrouter.Message{
-		{Role: "system", Content: "You are a code review expert. Analyze code and provide suggestions for improvement."},
-		{Role: "user", Content: "Review this {{language}} code: {{code}}"},
-	},
-}
-
 // emailClassificationOpenaiPrompt is generated from configuration
 var emailClassificationOpenaiPrompt = llmango.Prompt{
 	UID:      "email-classification-openai",
@@ -85,11 +57,11 @@ var emailClassificationClaudePrompt = llmango.Prompt{
 	},
 }
 
-// languageDetectionOpenaiPrompt is generated from configuration
-var languageDetectionOpenaiPrompt = llmango.Prompt{
-	UID:      "language-detection-openai",
+// languageDetectionLlamaPrompt is generated from configuration
+var languageDetectionLlamaPrompt = llmango.Prompt{
+	UID:      "language-detection-llama",
 	GoalUID:  "language-detection",
-	Model:    "openai/gpt-3.5-turbo",
+	Model:    "meta-llama/llama-3.1-405b-instruct",
 	Weight:   100,
 	IsCanary: false,
 	MaxRuns:  0,
@@ -127,6 +99,20 @@ var sentimentOpenaiPrompt = llmango.Prompt{
 	},
 }
 
+// codeReviewClaudePrompt is generated from configuration
+var codeReviewClaudePrompt = llmango.Prompt{
+	UID:      "code-review-claude",
+	GoalUID:  "code-review",
+	Model:    "anthropic/claude-3-sonnet",
+	Weight:   100,
+	IsCanary: false,
+	MaxRuns:  0,
+	Messages: []openrouter.Message{
+		{Role: "system", Content: "You are a code review expert. Analyze code and provide suggestions for improvement."},
+		{Role: "user", Content: "Review this {{language}} code: {{code}}"},
+	},
+}
+
 // translationOpenaiPrompt is generated from configuration
 var translationOpenaiPrompt = llmango.Prompt{
 	UID:      "translation-openai",
@@ -155,17 +141,31 @@ var textSummaryOpenaiPrompt = llmango.Prompt{
 	},
 }
 
-// languageDetectionLlamaPrompt is generated from configuration
-var languageDetectionLlamaPrompt = llmango.Prompt{
-	UID:      "language-detection-llama",
+// languageDetectionOpenaiPrompt is generated from configuration
+var languageDetectionOpenaiPrompt = llmango.Prompt{
+	UID:      "language-detection-openai",
 	GoalUID:  "language-detection",
-	Model:    "meta-llama/llama-3.1-405b-instruct",
+	Model:    "openai/gpt-3.5-turbo",
 	Weight:   100,
 	IsCanary: false,
 	MaxRuns:  0,
 	Messages: []openrouter.Message{
 		{Role: "system", Content: "You are a language detection expert. Identify the language of the given text and provide the language name and ISO code."},
 		{Role: "user", Content: "What language is this text: {{text}}"},
+	},
+}
+
+// sentimentUniversalPrompt is generated from configuration
+var sentimentUniversalPrompt = llmango.Prompt{
+	UID:      "sentiment-universal",
+	GoalUID:  "sentiment-analysis",
+	Model:    "anthropic/claude-3-sonnet",
+	Weight:   100,
+	IsCanary: false,
+	MaxRuns:  0,
+	Messages: []openrouter.Message{
+		{Role: "system", Content: "You are a sentiment analysis expert. Analyze the sentiment of the given text and provide a confidence score."},
+		{Role: "user", Content: "Analyze the sentiment of this text: {{text}}"},
 	},
 }
 
@@ -181,26 +181,26 @@ func CreateMango(or *openrouter.OpenRouter) (*Mango, error) {
 
 	// Initialize goals
 	llmangoManager.AddGoals(
+		translationGoal,
+		summaryGoal,
 		&emailClassificationGoal,
 		&languageDetectionGoal,
 		sentimentGoal,
 		codeReviewGoal,
-		translationGoal,
-		summaryGoal,
 	)
 
 	// Initialize prompts
 	llmangoManager.AddPrompts(
-		&sentimentUniversalPrompt,
-		&codeReviewClaudePrompt,
 		&emailClassificationOpenaiPrompt,
 		&emailClassificationClaudePrompt,
-		&languageDetectionOpenaiPrompt,
+		&languageDetectionLlamaPrompt,
 		&summaryUniversalPrompt,
 		&sentimentOpenaiPrompt,
+		&codeReviewClaudePrompt,
 		&translationOpenaiPrompt,
 		&textSummaryOpenaiPrompt,
-		&languageDetectionLlamaPrompt,
+		&languageDetectionOpenaiPrompt,
+		&sentimentUniversalPrompt,
 	)
 
 	return &Mango{
@@ -209,62 +209,38 @@ func CreateMango(or *openrouter.OpenRouter) (*Mango, error) {
 }
 
 
-// EmailClassification executes the Email Classification goal
-func (m *Mango) EmailClassification(input *EmailInput) (*EmailOutput, error) {
-	return llmango.Run[EmailInput, EmailOutput](m.LLMangoManager, &emailClassificationGoal, input)
-}
-
-// EmailClassificationRaw executes the Email Classification goal and returns the raw OpenRouter response
-func (m *Mango) EmailClassificationRaw(input *EmailInput) (*EmailOutput, *openrouter.NonStreamingChatResponse, error) {
-	return llmango.RunRaw[EmailInput, EmailOutput](m.LLMangoManager, &emailClassificationGoal, input)
-}
-
-// LanguageDetection executes the Language Detection goal
-func (m *Mango) LanguageDetection(input *LanguageInput) (*LanguageOutput, error) {
-	return llmango.Run[LanguageInput, LanguageOutput](m.LLMangoManager, &languageDetectionGoal, input)
-}
-
-// LanguageDetectionRaw executes the Language Detection goal and returns the raw OpenRouter response
-func (m *Mango) LanguageDetectionRaw(input *LanguageInput) (*LanguageOutput, *openrouter.NonStreamingChatResponse, error) {
-	return llmango.RunRaw[LanguageInput, LanguageOutput](m.LLMangoManager, &languageDetectionGoal, input)
-}
-
-// SentimentAnalysis executes the Sentiment Analysis goal
-func (m *Mango) SentimentAnalysis(input *SentimentInput) (*SentimentOutput, error) {
-	return llmango.Run[SentimentInput, SentimentOutput](m.LLMangoManager, sentimentGoal, input)
-}
-
-// SentimentAnalysisRaw executes the Sentiment Analysis goal and returns the raw OpenRouter response
-func (m *Mango) SentimentAnalysisRaw(input *SentimentInput) (*SentimentOutput, *openrouter.NonStreamingChatResponse, error) {
-	return llmango.RunRaw[SentimentInput, SentimentOutput](m.LLMangoManager, sentimentGoal, input)
-}
-
-// CodeReview executes the Code Review goal
-func (m *Mango) CodeReview(input *CodeReviewInput) (*CodeReviewOutput, error) {
-	return llmango.Run[CodeReviewInput, CodeReviewOutput](m.LLMangoManager, codeReviewGoal, input)
-}
-
-// CodeReviewRaw executes the Code Review goal and returns the raw OpenRouter response
-func (m *Mango) CodeReviewRaw(input *CodeReviewInput) (*CodeReviewOutput, *openrouter.NonStreamingChatResponse, error) {
-	return llmango.RunRaw[CodeReviewInput, CodeReviewOutput](m.LLMangoManager, codeReviewGoal, input)
-}
-
 // Translation executes the Translation goal
 func (m *Mango) Translation(input *TranslationInput) (*TranslationOutput, error) {
 	return llmango.Run[TranslationInput, TranslationOutput](m.LLMangoManager, translationGoal, input)
 }
 
-// TranslationRaw executes the Translation goal and returns the raw OpenRouter response
-func (m *Mango) TranslationRaw(input *TranslationInput) (*TranslationOutput, *openrouter.NonStreamingChatResponse, error) {
-	return llmango.RunRaw[TranslationInput, TranslationOutput](m.LLMangoManager, translationGoal, input)
-}
 
 // TextSummary executes the Text Summary goal
 func (m *Mango) TextSummary(input *SummaryInput) (*SummaryOutput, error) {
 	return llmango.Run[SummaryInput, SummaryOutput](m.LLMangoManager, summaryGoal, input)
 }
 
-// TextSummaryRaw executes the Text Summary goal and returns the raw OpenRouter response
-func (m *Mango) TextSummaryRaw(input *SummaryInput) (*SummaryOutput, *openrouter.NonStreamingChatResponse, error) {
-	return llmango.RunRaw[SummaryInput, SummaryOutput](m.LLMangoManager, summaryGoal, input)
+
+// EmailClassification executes the Email Classification goal
+func (m *Mango) EmailClassification(input *EmailInput) (*EmailOutput, error) {
+	return llmango.Run[EmailInput, EmailOutput](m.LLMangoManager, &emailClassificationGoal, input)
 }
+
+
+// LanguageDetection executes the Language Detection goal
+func (m *Mango) LanguageDetection(input *LanguageInput) (*LanguageOutput, error) {
+	return llmango.Run[LanguageInput, LanguageOutput](m.LLMangoManager, &languageDetectionGoal, input)
+}
+
+
+// SentimentAnalysis executes the Sentiment Analysis goal
+func (m *Mango) SentimentAnalysis(input *SentimentInput) (*SentimentOutput, error) {
+	return llmango.Run[SentimentInput, SentimentOutput](m.LLMangoManager, sentimentGoal, input)
+}
+
+
+// CodeReview executes the Code Review goal
+func (m *Mango) CodeReview(input *CodeReviewInput) (*CodeReviewOutput, error) {
+	return llmango.Run[CodeReviewInput, CodeReviewOutput](m.LLMangoManager, codeReviewGoal, input)
+}
+
