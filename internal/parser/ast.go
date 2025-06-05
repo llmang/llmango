@@ -314,9 +314,7 @@ func parsePromptLiteral(fset *token.FileSet, lit *ast.CompositeLit, varName, fil
 							// This is a simplified approach - in a real parser we'd need to resolve the variable
 							goalVarName := ident.Name
 							// Convert variable name to likely UID (remove "Goal" suffix if present)
-							if strings.HasSuffix(goalVarName, "Goal") {
-								goalVarName = goalVarName[:len(goalVarName)-4]
-							}
+							goalVarName = strings.TrimSuffix(goalVarName, "Goal")
 							// Convert camelCase to kebab-case
 							prompt.GoalUID = convertCamelToKebab(goalVarName)
 						}
