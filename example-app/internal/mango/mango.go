@@ -29,17 +29,31 @@ var languageDetectionGoal = llmango.Goal{
 	OutputExample: json.RawMessage(`{"confidence":0.98,"language":"French","language_code":"fr"}`),
 }
 
-// textSummaryOpenaiPrompt is generated from configuration
-var textSummaryOpenaiPrompt = llmango.Prompt{
-	UID:      "text-summary-openai",
-	GoalUID:  "text-summary",
-	Model:    "openai/gpt-4",
+// sentimentUniversalPrompt is generated from configuration
+var sentimentUniversalPrompt = llmango.Prompt{
+	UID:      "sentiment-universal",
+	GoalUID:  "sentiment-analysis",
+	Model:    "anthropic/claude-3-sonnet",
 	Weight:   100,
 	IsCanary: false,
 	MaxRuns:  0,
 	Messages: []openrouter.Message{
-		{Role: "system", Content: "You are a text summarization expert. Create concise summaries with key points and word counts."},
-		{Role: "user", Content: "Summarize this text and extract key points: {{text}}"},
+		{Role: "system", Content: "You are a sentiment analysis expert. Analyze the sentiment of the given text and provide a confidence score."},
+		{Role: "user", Content: "Analyze the sentiment of this text: {{text}}"},
+	},
+}
+
+// codeReviewClaudePrompt is generated from configuration
+var codeReviewClaudePrompt = llmango.Prompt{
+	UID:      "code-review-claude",
+	GoalUID:  "code-review",
+	Model:    "anthropic/claude-3-sonnet",
+	Weight:   100,
+	IsCanary: false,
+	MaxRuns:  0,
+	Messages: []openrouter.Message{
+		{Role: "system", Content: "You are a code review expert. Analyze code and provide suggestions for improvement."},
+		{Role: "user", Content: "Review this {{language}} code: {{code}}"},
 	},
 }
 
@@ -85,17 +99,17 @@ var languageDetectionOpenaiPrompt = llmango.Prompt{
 	},
 }
 
-// sentimentUniversalPrompt is generated from configuration
-var sentimentUniversalPrompt = llmango.Prompt{
-	UID:      "sentiment-universal",
-	GoalUID:  "sentiment-analysis",
-	Model:    "anthropic/claude-3-sonnet",
+// summaryUniversalPrompt is generated from configuration
+var summaryUniversalPrompt = llmango.Prompt{
+	UID:      "summary-universal",
+	GoalUID:  "text-summary",
+	Model:    "meta-llama/llama-3.1-405b-instruct",
 	Weight:   100,
 	IsCanary: false,
 	MaxRuns:  0,
 	Messages: []openrouter.Message{
-		{Role: "system", Content: "You are a sentiment analysis expert. Analyze the sentiment of the given text and provide a confidence score."},
-		{Role: "user", Content: "Analyze the sentiment of this text: {{text}}"},
+		{Role: "system", Content: "You are a text summarization expert. Create concise summaries with key points."},
+		{Role: "user", Content: "Summarize this text: {{text}}"},
 	},
 }
 
@@ -113,20 +127,6 @@ var sentimentOpenaiPrompt = llmango.Prompt{
 	},
 }
 
-// codeReviewClaudePrompt is generated from configuration
-var codeReviewClaudePrompt = llmango.Prompt{
-	UID:      "code-review-claude",
-	GoalUID:  "code-review",
-	Model:    "anthropic/claude-3-sonnet",
-	Weight:   100,
-	IsCanary: false,
-	MaxRuns:  0,
-	Messages: []openrouter.Message{
-		{Role: "system", Content: "You are a code review expert. Analyze code and provide suggestions for improvement."},
-		{Role: "user", Content: "Review this {{language}} code: {{code}}"},
-	},
-}
-
 // translationOpenaiPrompt is generated from configuration
 var translationOpenaiPrompt = llmango.Prompt{
 	UID:      "translation-openai",
@@ -138,6 +138,20 @@ var translationOpenaiPrompt = llmango.Prompt{
 	Messages: []openrouter.Message{
 		{Role: "system", Content: "You are a translation expert. Translate text accurately between languages."},
 		{Role: "user", Content: "Translate this text to {{target_lang}}: {{text}}"},
+	},
+}
+
+// textSummaryOpenaiPrompt is generated from configuration
+var textSummaryOpenaiPrompt = llmango.Prompt{
+	UID:      "text-summary-openai",
+	GoalUID:  "text-summary",
+	Model:    "openai/gpt-4",
+	Weight:   100,
+	IsCanary: false,
+	MaxRuns:  0,
+	Messages: []openrouter.Message{
+		{Role: "system", Content: "You are a text summarization expert. Create concise summaries with key points and word counts."},
+		{Role: "user", Content: "Summarize this text and extract key points: {{text}}"},
 	},
 }
 
@@ -155,23 +169,8 @@ var languageDetectionLlamaPrompt = llmango.Prompt{
 	},
 }
 
-// summaryUniversalPrompt is generated from configuration
-var summaryUniversalPrompt = llmango.Prompt{
-	UID:      "summary-universal",
-	GoalUID:  "text-summary",
-	Model:    "meta-llama/llama-3.1-405b-instruct",
-	Weight:   100,
-	IsCanary: false,
-	MaxRuns:  0,
-	Messages: []openrouter.Message{
-		{Role: "system", Content: "You are a text summarization expert. Create concise summaries with key points."},
-		{Role: "user", Content: "Summarize this text: {{text}}"},
-	},
-}
-
 type Mango struct {
 	*llmango.LLMangoManager
-	Debug bool
 }
 
 func CreateMango(or *openrouter.OpenRouter) (*Mango, error) {
@@ -192,73 +191,27 @@ func CreateMango(or *openrouter.OpenRouter) (*Mango, error) {
 
 	// Initialize prompts
 	llmangoManager.AddPrompts(
-		&textSummaryOpenaiPrompt,
+		&sentimentUniversalPrompt,
+		&codeReviewClaudePrompt,
 		&emailClassificationOpenaiPrompt,
 		&emailClassificationClaudePrompt,
 		&languageDetectionOpenaiPrompt,
-		&sentimentUniversalPrompt,
-		&sentimentOpenaiPrompt,
-		&codeReviewClaudePrompt,
-		&translationOpenaiPrompt,
-		&languageDetectionLlamaPrompt,
 		&summaryUniversalPrompt,
+		&sentimentOpenaiPrompt,
+		&translationOpenaiPrompt,
+		&textSummaryOpenaiPrompt,
+		&languageDetectionLlamaPrompt,
 	)
 
 	return &Mango{
 		LLMangoManager: llmangoManager,
-		Debug:          false, // Can be enabled by calling SetDebug(true)
 	}, nil
-}
-
-// SetDebug enables or disables debug logging for requests and responses
-func (m *Mango) SetDebug(enabled bool) {
-	m.Debug = enabled
-}
-
-// debugLog logs debug information if debug mode is enabled
-func (m *Mango) debugLog(format string, args ...interface{}) {
-	if m.Debug {
-		log.Printf("[MANGO DEBUG] "+format, args...)
-	}
 }
 
 
 // EmailClassification executes the Email Classification goal
 func (m *Mango) EmailClassification(input *EmailInput) (*EmailOutput, error) {
-	if m.Debug {
-		m.debugLog("=== EmailClassification Request ===")
-		inputJSON, _ := json.MarshalIndent(input, "", "  ")
-		m.debugLog("Input: %s", string(inputJSON))
-		
-		// Log goal schema information
-		m.debugLog("Goal: %s (%s)", "email-classification", "Email Classification")
-		m.debugLog("Input Schema: %s", string(emailClassificationGoal.InputExample))
-		m.debugLog("Output Schema: %s", string(emailClassificationGoal.OutputExample))
-	}
-	result, rawResponse, err := llmango.RunRaw[EmailInput, EmailOutput](m.LLMangoManager, &emailClassificationGoal, input)
-	
-	if m.Debug {
-		if err != nil {
-			m.debugLog("Error: %v", err)
-		} else {
-			// Log the raw response details
-			m.debugLog("Model Used: %s", rawResponse.Model)
-			m.debugLog("Usage - Prompt Tokens: %d, Completion Tokens: %d, Total: %d",
-				rawResponse.Usage.PromptTokens, rawResponse.Usage.CompletionTokens, rawResponse.Usage.TotalTokens)
-			
-			// Log the response
-			resultJSON, _ := json.MarshalIndent(result, "", "  ")
-			m.debugLog("Response: %s", string(resultJSON))
-			
-			// Log raw response if available
-			if len(rawResponse.Choices) > 0 {
-				m.debugLog("Raw Response Content: %s", rawResponse.Choices[0].Message.Content)
-			}
-		}
-		m.debugLog("=== EmailClassification Complete ===")
-	}
-	
-	return result, err
+	return llmango.Run[EmailInput, EmailOutput](m.LLMangoManager, &emailClassificationGoal, input)
 }
 
 // EmailClassificationRaw executes the Email Classification goal and returns the raw OpenRouter response
@@ -268,40 +221,7 @@ func (m *Mango) EmailClassificationRaw(input *EmailInput) (*EmailOutput, *openro
 
 // LanguageDetection executes the Language Detection goal
 func (m *Mango) LanguageDetection(input *LanguageInput) (*LanguageOutput, error) {
-	if m.Debug {
-		m.debugLog("=== LanguageDetection Request ===")
-		inputJSON, _ := json.MarshalIndent(input, "", "  ")
-		m.debugLog("Input: %s", string(inputJSON))
-		
-		// Log goal schema information
-		m.debugLog("Goal: %s (%s)", "language-detection", "Language Detection")
-		m.debugLog("Input Schema: %s", string(languageDetectionGoal.InputExample))
-		m.debugLog("Output Schema: %s", string(languageDetectionGoal.OutputExample))
-	}
-	result, rawResponse, err := llmango.RunRaw[LanguageInput, LanguageOutput](m.LLMangoManager, &languageDetectionGoal, input)
-	
-	if m.Debug {
-		if err != nil {
-			m.debugLog("Error: %v", err)
-		} else {
-			// Log the raw response details
-			m.debugLog("Model Used: %s", rawResponse.Model)
-			m.debugLog("Usage - Prompt Tokens: %d, Completion Tokens: %d, Total: %d",
-				rawResponse.Usage.PromptTokens, rawResponse.Usage.CompletionTokens, rawResponse.Usage.TotalTokens)
-			
-			// Log the response
-			resultJSON, _ := json.MarshalIndent(result, "", "  ")
-			m.debugLog("Response: %s", string(resultJSON))
-			
-			// Log raw response if available
-			if len(rawResponse.Choices) > 0 {
-				m.debugLog("Raw Response Content: %s", rawResponse.Choices[0].Message.Content)
-			}
-		}
-		m.debugLog("=== LanguageDetection Complete ===")
-	}
-	
-	return result, err
+	return llmango.Run[LanguageInput, LanguageOutput](m.LLMangoManager, &languageDetectionGoal, input)
 }
 
 // LanguageDetectionRaw executes the Language Detection goal and returns the raw OpenRouter response
@@ -311,40 +231,7 @@ func (m *Mango) LanguageDetectionRaw(input *LanguageInput) (*LanguageOutput, *op
 
 // SentimentAnalysis executes the Sentiment Analysis goal
 func (m *Mango) SentimentAnalysis(input *SentimentInput) (*SentimentOutput, error) {
-	if m.Debug {
-		m.debugLog("=== SentimentAnalysis Request ===")
-		inputJSON, _ := json.MarshalIndent(input, "", "  ")
-		m.debugLog("Input: %s", string(inputJSON))
-		
-		// Log goal schema information
-		m.debugLog("Goal: %s (%s)", "sentiment-analysis", "Sentiment Analysis")
-		m.debugLog("Input Schema: %s", string(sentimentGoal.InputExample))
-		m.debugLog("Output Schema: %s", string(sentimentGoal.OutputExample))
-	}
-	result, rawResponse, err := llmango.RunRaw[SentimentInput, SentimentOutput](m.LLMangoManager, sentimentGoal, input)
-	
-	if m.Debug {
-		if err != nil {
-			m.debugLog("Error: %v", err)
-		} else {
-			// Log the raw response details
-			m.debugLog("Model Used: %s", rawResponse.Model)
-			m.debugLog("Usage - Prompt Tokens: %d, Completion Tokens: %d, Total: %d",
-				rawResponse.Usage.PromptTokens, rawResponse.Usage.CompletionTokens, rawResponse.Usage.TotalTokens)
-			
-			// Log the response
-			resultJSON, _ := json.MarshalIndent(result, "", "  ")
-			m.debugLog("Response: %s", string(resultJSON))
-			
-			// Log raw response if available
-			if len(rawResponse.Choices) > 0 {
-				m.debugLog("Raw Response Content: %s", rawResponse.Choices[0].Message.Content)
-			}
-		}
-		m.debugLog("=== SentimentAnalysis Complete ===")
-	}
-	
-	return result, err
+	return llmango.Run[SentimentInput, SentimentOutput](m.LLMangoManager, sentimentGoal, input)
 }
 
 // SentimentAnalysisRaw executes the Sentiment Analysis goal and returns the raw OpenRouter response
@@ -354,40 +241,7 @@ func (m *Mango) SentimentAnalysisRaw(input *SentimentInput) (*SentimentOutput, *
 
 // CodeReview executes the Code Review goal
 func (m *Mango) CodeReview(input *CodeReviewInput) (*CodeReviewOutput, error) {
-	if m.Debug {
-		m.debugLog("=== CodeReview Request ===")
-		inputJSON, _ := json.MarshalIndent(input, "", "  ")
-		m.debugLog("Input: %s", string(inputJSON))
-		
-		// Log goal schema information
-		m.debugLog("Goal: %s (%s)", "code-review", "Code Review")
-		m.debugLog("Input Schema: %s", string(codeReviewGoal.InputExample))
-		m.debugLog("Output Schema: %s", string(codeReviewGoal.OutputExample))
-	}
-	result, rawResponse, err := llmango.RunRaw[CodeReviewInput, CodeReviewOutput](m.LLMangoManager, codeReviewGoal, input)
-	
-	if m.Debug {
-		if err != nil {
-			m.debugLog("Error: %v", err)
-		} else {
-			// Log the raw response details
-			m.debugLog("Model Used: %s", rawResponse.Model)
-			m.debugLog("Usage - Prompt Tokens: %d, Completion Tokens: %d, Total: %d",
-				rawResponse.Usage.PromptTokens, rawResponse.Usage.CompletionTokens, rawResponse.Usage.TotalTokens)
-			
-			// Log the response
-			resultJSON, _ := json.MarshalIndent(result, "", "  ")
-			m.debugLog("Response: %s", string(resultJSON))
-			
-			// Log raw response if available
-			if len(rawResponse.Choices) > 0 {
-				m.debugLog("Raw Response Content: %s", rawResponse.Choices[0].Message.Content)
-			}
-		}
-		m.debugLog("=== CodeReview Complete ===")
-	}
-	
-	return result, err
+	return llmango.Run[CodeReviewInput, CodeReviewOutput](m.LLMangoManager, codeReviewGoal, input)
 }
 
 // CodeReviewRaw executes the Code Review goal and returns the raw OpenRouter response
@@ -397,40 +251,7 @@ func (m *Mango) CodeReviewRaw(input *CodeReviewInput) (*CodeReviewOutput, *openr
 
 // Translation executes the Translation goal
 func (m *Mango) Translation(input *TranslationInput) (*TranslationOutput, error) {
-	if m.Debug {
-		m.debugLog("=== Translation Request ===")
-		inputJSON, _ := json.MarshalIndent(input, "", "  ")
-		m.debugLog("Input: %s", string(inputJSON))
-		
-		// Log goal schema information
-		m.debugLog("Goal: %s (%s)", "translation", "Translation")
-		m.debugLog("Input Schema: %s", string(translationGoal.InputExample))
-		m.debugLog("Output Schema: %s", string(translationGoal.OutputExample))
-	}
-	result, rawResponse, err := llmango.RunRaw[TranslationInput, TranslationOutput](m.LLMangoManager, translationGoal, input)
-	
-	if m.Debug {
-		if err != nil {
-			m.debugLog("Error: %v", err)
-		} else {
-			// Log the raw response details
-			m.debugLog("Model Used: %s", rawResponse.Model)
-			m.debugLog("Usage - Prompt Tokens: %d, Completion Tokens: %d, Total: %d",
-				rawResponse.Usage.PromptTokens, rawResponse.Usage.CompletionTokens, rawResponse.Usage.TotalTokens)
-			
-			// Log the response
-			resultJSON, _ := json.MarshalIndent(result, "", "  ")
-			m.debugLog("Response: %s", string(resultJSON))
-			
-			// Log raw response if available
-			if len(rawResponse.Choices) > 0 {
-				m.debugLog("Raw Response Content: %s", rawResponse.Choices[0].Message.Content)
-			}
-		}
-		m.debugLog("=== Translation Complete ===")
-	}
-	
-	return result, err
+	return llmango.Run[TranslationInput, TranslationOutput](m.LLMangoManager, translationGoal, input)
 }
 
 // TranslationRaw executes the Translation goal and returns the raw OpenRouter response
@@ -440,40 +261,7 @@ func (m *Mango) TranslationRaw(input *TranslationInput) (*TranslationOutput, *op
 
 // TextSummary executes the Text Summary goal
 func (m *Mango) TextSummary(input *SummaryInput) (*SummaryOutput, error) {
-	if m.Debug {
-		m.debugLog("=== TextSummary Request ===")
-		inputJSON, _ := json.MarshalIndent(input, "", "  ")
-		m.debugLog("Input: %s", string(inputJSON))
-		
-		// Log goal schema information
-		m.debugLog("Goal: %s (%s)", "text-summary", "Text Summary")
-		m.debugLog("Input Schema: %s", string(summaryGoal.InputExample))
-		m.debugLog("Output Schema: %s", string(summaryGoal.OutputExample))
-	}
-	result, rawResponse, err := llmango.RunRaw[SummaryInput, SummaryOutput](m.LLMangoManager, summaryGoal, input)
-	
-	if m.Debug {
-		if err != nil {
-			m.debugLog("Error: %v", err)
-		} else {
-			// Log the raw response details
-			m.debugLog("Model Used: %s", rawResponse.Model)
-			m.debugLog("Usage - Prompt Tokens: %d, Completion Tokens: %d, Total: %d",
-				rawResponse.Usage.PromptTokens, rawResponse.Usage.CompletionTokens, rawResponse.Usage.TotalTokens)
-			
-			// Log the response
-			resultJSON, _ := json.MarshalIndent(result, "", "  ")
-			m.debugLog("Response: %s", string(resultJSON))
-			
-			// Log raw response if available
-			if len(rawResponse.Choices) > 0 {
-				m.debugLog("Raw Response Content: %s", rawResponse.Choices[0].Message.Content)
-			}
-		}
-		m.debugLog("=== TextSummary Complete ===")
-	}
-	
-	return result, err
+	return llmango.Run[SummaryInput, SummaryOutput](m.LLMangoManager, summaryGoal, input)
 }
 
 // TextSummaryRaw executes the Text Summary goal and returns the raw OpenRouter response
