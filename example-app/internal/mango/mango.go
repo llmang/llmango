@@ -6,6 +6,7 @@ import (
 	"log"
 
 	"github.com/llmang/llmango/llmango"
+	"github.com/llmang/llmango/llmangoagents"
 	"github.com/llmang/llmango/openrouter"
 )
 
@@ -161,7 +162,8 @@ var languageDetectionLlamaPrompt = llmango.Prompt{
 
 type Mango struct {
 	*llmango.LLMangoManager
-	Debug bool
+	AgentSystem *llmangoagents.AgentSystemManager
+	Debug       bool
 }
 
 func CreateMango(or *openrouter.OpenRouter) (*Mango, error) {

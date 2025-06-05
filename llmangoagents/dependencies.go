@@ -38,7 +38,7 @@ func BuildDependencyGraph(inputs SystemInputList) (*DependencyGraph, error) {
 	// PHASE 1: Create tool registry (tools are external dependencies, not part of dependency graph)
 	toolRegistry := make(map[string]bool)
 	for _, tool := range inputs.Tools {
-		toolRegistry[tool.UID] = true
+		toolRegistry[tool.Uid] = true
 	}
 
 	// PHASE 2: Create agent and workflow nodes with their internal system dependencies

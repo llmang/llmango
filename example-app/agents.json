@@ -1,0 +1,81 @@
+{
+  "tools": [],
+  "agents": [
+    {
+      "uid": "organizer_agent",
+      "name": "Task Organizer Agent",
+      "description": "Analyzes user requests and determines which specialized agent (such as Sentiment Analysis or Correction Verification) should handle the task. Routes input to the most appropriate agent based on intent.",
+      "systemMessage": "You are an intelligent task organizer. Your job is to analyze the user's request and decide which specialized agent (Sentiment Analysis or Correction Verification) should handle the task. Route the input to the most appropriate agent based on the user's intent.\n Make tool calls as needed once you are done with the goal STOP making toolcalls",
+      "model": "openai/gpt-4.1-mini",
+      "parameters": "{\"temperature\": 0.3}",
+      "tools": [],
+      "preProcessors": [],
+      "subAgents": [],
+      "subWorkflows": []
+    },
+    {
+      "uid": "text_cleaning_agent",
+      "name": "Text Cleaning Agent",
+      "description": "Cleans and condenses provided text by removing irrelevant, nonsensical, or dirty content while preserving the original meaning and intent.",
+      "systemMessage": "You are a text cleaning expert. Your job is to take any provided text and remove irrelevant, nonsensical, or dirty content, such as random characters, repeated punctuation, or unrelated phrases. Return a condensed version of the text that maintains its original meaning and intent, but is clear, concise, and free of noise. Do not add or invent new information.",
+      "model": "openai/gpt-4.1-mini",
+      "parameters": "{\"temperature\": 0.2}",
+      "tools": [],
+      "preProcessors": [],
+      "subAgents": [],
+      "subWorkflows": []
+    },
+    {
+      "uid": "sentiment_agent",
+      "name": "Sentiment Analysis Agent",
+      "description": "Analyzes provided text to determine sentiment (positive, negative, or neutral), provides reasoning, confidence score, keywords, and a sentiment score from 0-100. Only analyzes very clean text transcriptions.",
+      "systemMessage": "You are a sentiment analysis expert. Analyze the provided text and determine its sentiment (positive, negative, or neutral).Provide a brief reasoning for your thoughts. A confidence percnetage score. some keywords that stood out showing sentiment and a score 0-100 neg-pos",
+      "model": "openai/gpt-4.1-mini",
+      "parameters": "{\"temperature\": 0.2}",
+      "tools": [],
+      "preProcessors": [],
+      "subAgents": [],
+      "subWorkflows": []
+    },
+    {
+      "uid": "formatter_agent",
+      "name": "Formatter Agent",
+      "description": "Formats any information or response as valid, well-formed JSON. Ensures outputs are always valid JSON, especially for sentiment or scoring responses.",
+      "systemMessage": "You are a strict JSON formatter. Your job is to take any information or response and output it as valid, well-formed JSON. If the input is not valid JSON, convert or wrap it into a valid JSON object. Never return anything except valid JSON. When formatting sentiment or scoring responses, always respond back with: 1. the score (good=high, bad=low, scale is 0-100), and 2. a keyword list to describe it. Example output:\n{\"score\": 87, \"keywords\": [\"positive\", \"enthusiastic\", \"loved the look\"]}",
+      "model": "openai/gpt-4.1-mini",
+      "parameters": "{\"temperature\": 0.2}",
+      "tools": [],
+      "preProcessors": [],
+      "subAgents": [],
+      "subWorkflows": []
+    }
+  ],
+  "workflows": [
+    {
+      "uid": "text_classifier_workflow",
+      "name": "Text Classifier Workflow",
+      "description": "A workflow that analyzes the user's text, extracts keywords, assesses a score, and then formats the result in the proper JSON format.",
+      "options": {
+        "maxTime": 300,
+        "maxSteps": 5,
+        "maxSpend": 50
+      },
+      "steps": [
+        {
+          "description":"This step prepares the text by cleaning it if that is needed and also classifying it using a classifier agent.",
+          "uid": "text_classifier_step",
+          "agent": "organizer_agent",
+          "exitBehavior": "default",
+          "subAgents": ["text_cleaning_agent", "sentiment_agent"]
+        },
+        {
+          "description": "Format the analysis results into valid, well-structured JSON output",
+          "uid": "formatter_step",
+          "agent": "formatter_agent",
+          "subAgents": [],
+          "exitBehavior": "default"
+        }
+      ]
+    }
+  ]
+}
