@@ -14,6 +14,7 @@ type DiscoveredGoal struct {
 	SourceFile       string `json:"source_file" yaml:"source_file"`
 	SourceType       string `json:"source_type" yaml:"source_type"` // "go" or "config"
 	VarName          string `json:"var_name" yaml:"var_name"`       // Variable name in Go code
+	IsPointer        bool   `json:"is_pointer" yaml:"is_pointer"`   // Whether this goal variable is a pointer
 }
 
 // DiscoveredPrompt represents a prompt found during parsing
@@ -78,9 +79,10 @@ type ConfigPrompt struct {
 
 // GenerateOptions contains options for code generation
 type GenerateOptions struct {
-	InputDir    string
-	OutputFile  string
-	ConfigFile  string
-	PackageName string
-	Validate    bool
+	InputDir     string
+	OutputFile   string
+	ConfigFile   string
+	PackageName  string
+	GoSourceDir  string
+	Validate     bool
 }

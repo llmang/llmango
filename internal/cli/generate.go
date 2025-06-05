@@ -29,6 +29,7 @@ type-safe wrapper functions.`,
 	cmd.Flags().StringVarP(&opts.OutputFile, "output", "o", "", "Output file path (default: mango/mango.go if mango dir exists, otherwise mango.go)")
 	cmd.Flags().StringVarP(&opts.ConfigFile, "config", "c", "", "Specific config file to use (optional)")
 	cmd.Flags().StringVarP(&opts.PackageName, "package", "p", "mango", "Package name for generated code")
+	cmd.Flags().StringVar(&opts.GoSourceDir, "go-source", "", "Directory to scan for Go goal definitions (default: same as input dir)")
 	cmd.Flags().BoolVar(&opts.Validate, "validate", false, "Validate only, don't generate code")
 
 	return cmd
@@ -46,9 +47,20 @@ func runGenerate(opts *parser.GenerateOptions) error {
 		return fmt.Errorf("input directory does not exist: %s", opts.InputDir)
 	}
 
-	// Parse Go files
-	fmt.Printf("Scanning Go files in %s...\n", opts.InputDir)
-	goResult, err := parser.ParseGoFiles(opts.InputDir)
+	// Determine Go source directory
+	goSourceDir := opts.GoSourceDir
+	if goSourceDir == "" {
+		goSourceDir = opts.InputDir
+	}
+
+	// Parse Go files (exclude the output file to avoid conflicts)
+	fmt.Printf("Scanning Go files in %s...\n", goSourceDir)
+	
+	// Always exclude the output file basename to prevent scanning generated code
+	excludeFiles := []string{filepath.Base(opts.OutputFile)}
+	fmt.Printf("Excluding files: %v\n", excludeFiles)
+	
+	goResult, err := parser.ParseGoFilesWithExclusions(goSourceDir, excludeFiles)
 	if err != nil {
 		return fmt.Errorf("failed to parse Go files: %w", err)
 	}
@@ -115,18 +127,22 @@ func runGenerate(opts *parser.GenerateOptions) error {
 func setSmartDefaults(opts *parser.GenerateOptions) error {
 	// Set input directory default
 	if opts.InputDir == "" {
-		// Check for mango directories in common locations
+		opts.InputDir = "." // Always scan current directory for config files
+	}
+
+	// Set Go source directory default - check mango directories first
+	if opts.GoSourceDir == "" {
 		mangoDirs := []string{"mango", "internal/mango", "./mango", "./internal/mango"}
 		found := false
 		for _, dir := range mangoDirs {
 			if _, err := os.Stat(dir); err == nil {
-				opts.InputDir = "." // Scan current directory which contains the mango folder
+				opts.GoSourceDir = dir
 				found = true
 				break
 			}
 		}
 		if !found {
-			opts.InputDir = "."
+			opts.GoSourceDir = "." // Fall back to current directory
 		}
 	}
 

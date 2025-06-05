@@ -74,6 +74,7 @@ func parseConfigFile(filename string, result *ParseResult) error {
 			SourceFile:  filename,
 			SourceType:  "config",
 			VarName:     generateVarName(configGoal.UID, "Goal"),
+			IsPointer:   false, // Config goals are generated as values, we'll take their address
 		}
 
 		// Convert input example to JSON string and validate

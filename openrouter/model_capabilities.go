@@ -1,9 +1,5 @@
 package openrouter
 
-import (
-	"fmt"
-)
-
 // StructuredOutputModels is a simple set of models that support structured output
 // If a model is in this set, it supports structured output. If not, it doesn't.
 // This determines which execution path (structured vs universal) to use
@@ -91,7 +87,6 @@ func SupportsStructuredOutput(modelID string) bool {
 		return false
 	}
 	_, exists := StructuredOutputModels[modelID]
-	fmt.Printf("\n Checked Support and Got %v for model %v", exists, modelID)
 	return exists
 }
 

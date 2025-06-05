@@ -1,3 +1,6 @@
 assets/
 .env
+example-app/.env
+llmango
 /example-app/example-app
+.DS_Store

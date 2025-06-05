@@ -269,7 +269,7 @@ type PromptCompletionResponse struct {
 // autoConfigureProviderRequirements automatically sets ProviderRequireParameters
 // to true when ResponseFormat is detected (structured output)
 func (r *OpenRouterRequest) autoConfigureProviderRequirements() {
-	if r.Parameters.ResponseFormat != nil && len(r.Parameters.ResponseFormat) > 2 {
+	if len(r.Parameters.ResponseFormat) > 2 {
 		// Check if it's more than just "{}" - meaningful structured output
 		responseStr := string(r.Parameters.ResponseFormat)
 		if responseStr != "{}" && responseStr != "" {
@@ -302,7 +302,6 @@ func (o *OpenRouter) executeOpenRouterRequest(request *OpenRouterRequest) ([]byt
 	if err != nil {
 		return nil, fmt.Errorf("error marshaling request: %w", err)
 	}
-
 	// Create the new HTTP request
 	req, err := http.NewRequest("POST", "https://openrouter.ai/api/v1/chat/completions", bytes.NewBuffer(jsonData))
 	if err != nil {
@@ -312,8 +311,6 @@ func (o *OpenRouter) executeOpenRouterRequest(request *OpenRouterRequest) ([]byt
 	// Set headers
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", "Bearer "+o.ApiKey)
-	// TODO: Add other optional headers like "HTTP-Referer", "X-Title" if needed
-
 	// Send the request with a timeout
 	client := &http.Client{Timeout: 5 * time.Minute} // Consider making timeout configurable
 	resp, err := client.Do(req)
