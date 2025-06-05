@@ -58,7 +58,6 @@ func runGenerate(opts *parser.GenerateOptions) error {
 	
 	// Always exclude the output file basename to prevent scanning generated code
 	excludeFiles := []string{filepath.Base(opts.OutputFile)}
-	fmt.Printf("Excluding files: %v\n", excludeFiles)
 	
 	goResult, err := parser.ParseGoFilesWithExclusions(goSourceDir, excludeFiles)
 	if err != nil {

@@ -12,7 +12,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"log"
 	"net/http"
 	"os"
 	"strings"
@@ -276,7 +275,6 @@ func (r *OpenRouterRequest) autoConfigureProviderRequirements() {
 			if r.Parameters.ProviderRequireParameters == nil {
 				requireParams := true
 				r.Parameters.ProviderRequireParameters = &requireParams
-				log.Printf("🔧 Auto-detected structured output: setting require_parameters=true")
 			}
 		}
 	}

@@ -35,17 +35,14 @@ func ParseGoFilesWithExclusions(dir string, excludeFiles []string) (*ParseResult
 		// Skip excluded files
 		for _, exclude := range excludeFiles {
 			if matched, _ := filepath.Match(exclude, info.Name()); matched {
-				fmt.Printf("EXCLUDING file %s (matched pattern %s)\n", info.Name(), exclude)
 				return false
 			}
 			// Also check full path match
 			if info.Name() == filepath.Base(exclude) {
-				fmt.Printf("EXCLUDING file %s (exact match %s)\n", info.Name(), exclude)
 				return false
 			}
 		}
 		
-		fmt.Printf("INCLUDING file %s\n", info.Name())
 		return true
 	}
 
@@ -86,7 +83,7 @@ func parseValueSpec(fset *token.FileSet, spec *ast.ValueSpec, filename string, r
 	for i, name := range spec.Names {
 		if i < len(spec.Values) {
 			value := spec.Values[i]
-			
+
 			// Try to parse as function call first (NewGoal, NewJSONGoal)
 			if callExpr, ok := value.(*ast.CallExpr); ok {
 				if goal := parseFunctionCall(fset, callExpr, name.Name, filename); goal != nil {
@@ -94,7 +91,7 @@ func parseValueSpec(fset *token.FileSet, spec *ast.ValueSpec, filename string, r
 					continue
 				}
 			}
-			
+
 			// Fall back to composite literal parsing (Goal{}, Prompt{})
 			if compositeLit, ok := value.(*ast.CompositeLit); ok {
 				if selectorExpr, ok := compositeLit.Type.(*ast.SelectorExpr); ok {
@@ -371,18 +368,18 @@ func GenerateMethodName(goalUID string) string {
 	// Remove non-alphanumeric characters and convert to PascalCase
 	re := regexp.MustCompile(`[^a-zA-Z0-9]+`)
 	parts := re.Split(goalUID, -1)
-	
+
 	var result strings.Builder
 	for _, part := range parts {
 		if part != "" {
 			result.WriteString(strings.Title(strings.ToLower(part)))
 		}
 	}
-	
+
 	methodName := result.String()
 	if methodName == "" {
 		methodName = "UnnamedGoal"
 	}
-	
+
 	return methodName
 }
