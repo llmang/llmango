@@ -77,6 +77,7 @@ type LanguageOutput struct {
 }
 
 // Inline Go Goals (using NewGoal - these return *Goal pointers)
+//llmango:raw
 var sentimentGoal = llmango.NewGoal(
 	"sentiment-analysis",
 	"Sentiment Analysis",

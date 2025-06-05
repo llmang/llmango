@@ -19,7 +19,8 @@ type TemplateData struct {
 // GoalData contains goal data for template rendering
 type GoalData struct {
 	parser.DiscoveredGoal
-	MethodName string
+	MethodName        string
+	ShouldGenerateRaw bool
 }
 
 // PromptData contains prompt data for template rendering
@@ -48,9 +49,13 @@ func GenerateMangoFile(result *parser.ParseResult, opts *parser.GenerateOptions)
 		methodName := generateUniqueMethodName(goal.UID, methodNames)
 		methodNames[methodName] = true
 
+		// Check if this goal should have a Raw method generated
+		shouldGenerateRaw := result.RawGoalFunctions[goal.UID]
+
 		data.Goals = append(data.Goals, GoalData{
-			DiscoveredGoal: goal,
-			MethodName:     methodName,
+			DiscoveredGoal:    goal,
+			MethodName:        methodName,
+			ShouldGenerateRaw: shouldGenerateRaw,
 		})
 	}
 

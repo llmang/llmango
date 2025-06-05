@@ -13,9 +13,10 @@ import (
 // ParseConfigFiles scans for and parses llmango configuration files
 func ParseConfigFiles(dir string) (*ParseResult, error) {
 	result := &ParseResult{
-		Goals:   []DiscoveredGoal{},
-		Prompts: []DiscoveredPrompt{},
-		Errors:  []ParseError{},
+		Goals:            []DiscoveredGoal{},
+		Prompts:          []DiscoveredPrompt{},
+		Errors:           []ParseError{},
+		RawGoalFunctions: make(map[string]bool),
 	}
 
 	// Look for configuration files
@@ -61,6 +62,13 @@ func parseConfigFile(filename string, result *ParseResult) error {
 		}
 	default:
 		return fmt.Errorf("unsupported file extension: %s", ext)
+	}
+
+	// Process generateOptions if present
+	if config.GenerateOptions != nil && len(config.GenerateOptions.RawGoalFunctions) > 0 {
+		for _, goalUID := range config.GenerateOptions.RawGoalFunctions {
+			result.RawGoalFunctions[goalUID] = true
+		}
 	}
 
 	// Convert config goals to discovered goals
@@ -258,9 +266,10 @@ func generateVarName(uid, suffix string) string {
 // MergeResults combines results from Go files and config files, handling conflicts
 func MergeResults(goResult, configResult *ParseResult) *ParseResult {
 	merged := &ParseResult{
-		Goals:   make([]DiscoveredGoal, 0),
-		Prompts: make([]DiscoveredPrompt, 0),
-		Errors:  make([]ParseError, 0),
+		Goals:            make([]DiscoveredGoal, 0),
+		Prompts:          make([]DiscoveredPrompt, 0),
+		Errors:           make([]ParseError, 0),
+		RawGoalFunctions: make(map[string]bool),
 	}
 
 	// Copy all errors
@@ -315,6 +324,14 @@ func MergeResults(goResult, configResult *ParseResult) *ParseResult {
 	// Convert map back to slice
 	for _, prompt := range promptMap {
 		merged.Prompts = append(merged.Prompts, prompt)
+	}
+
+	// Merge RawGoalFunctions maps - combine both config and Go-detected raw functions
+	for goalUID := range configResult.RawGoalFunctions {
+		merged.RawGoalFunctions[goalUID] = true
+	}
+	for goalUID := range goResult.RawGoalFunctions {
+		merged.RawGoalFunctions[goalUID] = true
 	}
 
 	return merged

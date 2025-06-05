@@ -34,9 +34,10 @@ type DiscoveredPrompt struct {
 
 // ParseResult contains all discovered goals and prompts
 type ParseResult struct {
-	Goals   []DiscoveredGoal   `json:"goals" yaml:"goals"`
-	Prompts []DiscoveredPrompt `json:"prompts" yaml:"prompts"`
-	Errors  []ParseError       `json:"errors,omitempty" yaml:"errors,omitempty"`
+	Goals            []DiscoveredGoal   `json:"goals" yaml:"goals"`
+	Prompts          []DiscoveredPrompt `json:"prompts" yaml:"prompts"`
+	Errors           []ParseError       `json:"errors,omitempty" yaml:"errors,omitempty"`
+	RawGoalFunctions map[string]bool    `json:"raw_goal_functions,omitempty" yaml:"raw_goal_functions,omitempty"`
 }
 
 // ParseError represents an error encountered during parsing
@@ -48,10 +49,19 @@ type ParseError struct {
 	Type    string `json:"type" yaml:"type"` // "warning" or "error"
 }
 
+// ConfigGenerateOptions represents generation options in config
+type ConfigGenerateOptions struct {
+	RawGoalFunctions []string `json:"rawGoalFunctions,omitempty" yaml:"rawGoalFunctions,omitempty"`
+	// Future options can be added here:
+	// DebugMode bool `json:"debugMode,omitempty" yaml:"debugMode,omitempty"`
+	// CustomValidators []string `json:"customValidators,omitempty" yaml:"customValidators,omitempty"`
+}
+
 // Config represents the structure of llmango.yaml/json files
 type Config struct {
-	Goals   []ConfigGoal   `json:"goals" yaml:"goals"`
-	Prompts []ConfigPrompt `json:"prompts" yaml:"prompts"`
+	Goals           []ConfigGoal           `json:"goals" yaml:"goals"`
+	Prompts         []ConfigPrompt         `json:"prompts" yaml:"prompts"`
+	GenerateOptions *ConfigGenerateOptions `json:"generateOptions,omitempty" yaml:"generateOptions,omitempty"`
 }
 
 // ConfigGoal represents a goal defined in configuration

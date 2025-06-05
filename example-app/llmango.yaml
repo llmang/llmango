@@ -1,6 +1,12 @@
 # LLMango Dual-Path Test Configuration
 # NOTE: sentiment-analysis and text-summary goals are defined in Go code using NewGoal() (pointers)
 # The goals below are config-only goals (will be generated as values)
+
+# Generation options for optional features
+generateOptions:
+  rawGoalFunctions:
+    - "email-classification"
+
 goals:
   # Config-based goals (these will be generated from config, not Go code)
   - uid: "email-classification"

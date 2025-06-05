@@ -20,9 +20,10 @@ func ParseGoFiles(dir string) (*ParseResult, error) {
 // excluding files that match the provided exclusion patterns
 func ParseGoFilesWithExclusions(dir string, excludeFiles []string) (*ParseResult, error) {
 	result := &ParseResult{
-		Goals:   []DiscoveredGoal{},
-		Prompts: []DiscoveredPrompt{},
-		Errors:  []ParseError{},
+		Goals:            []DiscoveredGoal{},
+		Prompts:          []DiscoveredPrompt{},
+		Errors:           []ParseError{},
+		RawGoalFunctions: make(map[string]bool),
 	}
 
 	// Create a filter function that excludes specified files
@@ -69,7 +70,7 @@ func parseFile(fset *token.FileSet, file *ast.File, filename string, result *Par
 			if node.Tok == token.VAR {
 				for _, spec := range node.Specs {
 					if valueSpec, ok := spec.(*ast.ValueSpec); ok {
-						parseValueSpec(fset, valueSpec, filename, result)
+						parseValueSpec(fset, file, valueSpec, filename, result)
 					}
 				}
 			}
@@ -79,15 +80,22 @@ func parseFile(fset *token.FileSet, file *ast.File, filename string, result *Par
 }
 
 // parseValueSpec extracts goal or prompt from a variable declaration
-func parseValueSpec(fset *token.FileSet, spec *ast.ValueSpec, filename string, result *ParseResult) {
+func parseValueSpec(fset *token.FileSet, file *ast.File, spec *ast.ValueSpec, filename string, result *ParseResult) {
 	for i, name := range spec.Names {
 		if i < len(spec.Values) {
 			value := spec.Values[i]
+
+			// Check for //llmango:raw comment above this variable declaration
+			hasRawComment := checkForRawComment(fset, file, spec)
 
 			// Try to parse as function call first (NewGoal, NewJSONGoal)
 			if callExpr, ok := value.(*ast.CallExpr); ok {
 				if goal := parseFunctionCall(fset, callExpr, name.Name, filename); goal != nil {
 					result.Goals = append(result.Goals, *goal)
+					// If this goal has a raw comment, add it to the raw functions map
+					if hasRawComment {
+						result.RawGoalFunctions[goal.UID] = true
+					}
 					continue
 				}
 			}
@@ -382,4 +390,32 @@ func GenerateMethodName(goalUID string) string {
 	}
 
 	return methodName
+}
+
+// checkForRawComment checks if there's a //llmango:raw comment above the variable declaration
+func checkForRawComment(fset *token.FileSet, file *ast.File, spec *ast.ValueSpec) bool {
+	// Get the position of the variable declaration
+	pos := spec.Pos()
+	
+	// Look through all comment groups in the file
+	for _, commentGroup := range file.Comments {
+		// Check if this comment group is before our variable declaration
+		if commentGroup.End() < pos {
+			// Check if the comment is on the line immediately before the declaration
+			commentEndPos := fset.Position(commentGroup.End())
+			varStartPos := fset.Position(pos)
+			
+			// Allow for the comment to be on the same line or the line immediately before
+			if varStartPos.Line-commentEndPos.Line <= 1 {
+				// Check if any comment in this group contains "//llmango:raw"
+				for _, comment := range commentGroup.List {
+					if strings.TrimSpace(comment.Text) == "//llmango:raw" {
+						return true
+					}
+				}
+			}
+		}
+	}
+	
+	return false
 }
