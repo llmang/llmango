@@ -39,7 +39,7 @@ prompts:
   # Prompts for Go-defined goals (pointer goals)
   - uid: "sentiment-openai"
     goal_uid: "sentiment-analysis"
-    model: "openai/gpt-4"
+    model: "deepseek/deepseek-chat-v3-0324"
     weight: 100
     messages:
       - role: "system"
@@ -49,7 +49,7 @@ prompts:
         
   - uid: "code-review-claude"
     goal_uid: "code-review"
-    model: "anthropic/claude-3-sonnet"
+    model: "nousresearch/hermes-3-llama-3.1-405b"
     weight: 100
     messages:
       - role: "system"
@@ -59,7 +59,7 @@ prompts:
 
   - uid: "translation-openai"
     goal_uid: "translation"
-    model: "openai/gpt-4"
+    model: "deepseek/deepseek-chat-v3-0324"
     weight: 100
     messages:
       - role: "system"
@@ -69,7 +69,7 @@ prompts:
 
   - uid: "text-summary-openai"
     goal_uid: "text-summary"
-    model: "openai/gpt-4"
+    model: "deepseek/deepseek-chat-v3-0324"
     weight: 100
     messages:
       - role: "system"
@@ -80,7 +80,7 @@ prompts:
   # Prompts for config-based goals
   - uid: "email-classification-openai"
     goal_uid: "email-classification"
-    model: "openai/gpt-4"
+    model: "deepseek/deepseek-chat-v3-0324"
     weight: 100
     messages:
       - role: "system"
@@ -90,7 +90,7 @@ prompts:
 
   - uid: "email-classification-claude"
     goal_uid: "email-classification"
-    model: "anthropic/claude-3-sonnet"
+    model: "nousresearch/hermes-3-llama-3.1-405b"
     weight: 100
     messages:
       - role: "system"
@@ -100,7 +100,7 @@ prompts:
 
   - uid: "language-detection-openai"
     goal_uid: "language-detection"
-    model: "openai/gpt-3.5-turbo"
+    model: "x-ai/grok-3-mini-beta"
     weight: 100
     messages:
       - role: "system"
@@ -110,7 +110,7 @@ prompts:
 
   - uid: "language-detection-llama"
     goal_uid: "language-detection"
-    model: "meta-llama/llama-3.1-405b-instruct"
+    model: "openai/gpt-4.1-mini"
     weight: 100
     messages:
       - role: "system"
@@ -121,7 +121,7 @@ prompts:
   # Universal Compatibility Prompts (Non-OpenAI models)
   - uid: "sentiment-universal"
     goal_uid: "sentiment-analysis"
-    model: "anthropic/claude-3-sonnet"
+    model: "openai/gpt-4.1-mini"
     weight: 100
     messages:
       - role: "system"
@@ -131,7 +131,7 @@ prompts:
         
   - uid: "summary-universal"
     goal_uid: "text-summary"
-    model: "meta-llama/llama-3.1-405b-instruct"
+    model: "nousresearch/hermes-3-llama-3.1-405b"
     weight: 100
     messages:
       - role: "system"
